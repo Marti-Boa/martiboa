@@ -130,7 +130,6 @@
         .btn-b { bottom: 0; left: 45px; background: #ff3333; }
         .btn-a { top: 45px; right: 0; background: #00cc66; }
 
-        /* System Buttons moved to top center */
         .pill-btn {
             background: #333;
             width: 65px;
@@ -140,7 +139,6 @@
             text-transform: uppercase;
         }
 
-        /* L & R Bumpers */
         .bumper {
             width: 70px;
             height: 35px;
@@ -163,28 +161,28 @@
         
         <div id="touch-controls">
             <div class="row">
-                <div class="btn bumper" data-button="l">L</div>
+                <div class="btn bumper" data-gamepad-index="4">L</div>
                 <div class="center-pills">
-                    <div class="btn pill-btn" data-button="select">Select</div>
-                    <div class="btn pill-btn" data-button="start">Start</div>
+                    <div class="btn pill-btn" data-gamepad-index="8">Select</div>
+                    <div class="btn pill-btn" data-gamepad-index="9">Start</div>
                 </div>
-                <div class="btn bumper" data-button="r">R</div>
+                <div class="btn bumper" data-gamepad-index="5">R</div>
             </div>
 
             <div class="row">
                 <div class="dpad">
-                    <div class="btn dpad-btn dpad-up" data-button="up">↑</div>
-                    <div class="btn dpad-btn dpad-down" data-button="down">↓</div>
-                    <div class="btn dpad-btn dpad-left" data-button="left">←</div>
-                    <div class="btn dpad-btn dpad-right" data-button="right">→</div>
+                    <div class="btn dpad-btn dpad-up" data-gamepad-index="12">↑</div>
+                    <div class="btn dpad-btn dpad-down" data-gamepad-index="13">↓</div>
+                    <div class="btn dpad-btn dpad-left" data-gamepad-index="14">←</div>
+                    <div class="btn dpad-btn dpad-right" data-gamepad-index="15">→</div>
                     <div class="dpad-btn dpad-center"></div>
                 </div>
 
                 <div class="action-group">
-                    <div class="btn abxy btn-x" data-button="x">X</div>
-                    <div class="btn abxy btn-y" data-button="y">Y</div>
-                    <div class="btn abxy btn-a" data-button="a">A</div>
-                    <div class="btn abxy btn-b" data-button="b">B</div>
+                    <div class="btn abxy btn-x" data-gamepad-index="3">X</div>
+                    <div class="btn abxy btn-y" data-gamepad-index="2">Y</div>
+                    <div class="btn abxy btn-a" data-gamepad-index="1">A</div>
+                    <div class="btn abxy btn-b" data-gamepad-index="0">B</div>
                 </div>
             </div>
         </div>
@@ -192,14 +190,40 @@
 
     <script>
         const ROM_FILENAME = 'super-mario-kart.sfc'; 
-        let emulator = null;
-        let activeLoops = {}; // Stores intervals for holding buttons
+
+        // State storage for our "Phantom Gamepad"
+        const virtualGamepadState = {
+            buttons: Array(16).fill(0) // Array of 16 buttons defaults to unpressed
+        };
+
+        // Trick the browser into thinking a real gamepad is active
+        const originalGetGamepads = navigator.getGamepads.bind(navigator);
+        navigator.getGamepads = function() {
+            const originalArray = originalGetGamepads();
+            
+            // Generate a synthetic gamepad object adhering to strict Browser specs
+            const fakeGamepad = {
+                id: "Standard Gamepad (Virtual Touch)",
+                index: 0,
+                connected: true,
+                timestamp: performance.now(),
+                mapping: "standard",
+                axes: [0, 0, 0, 0],
+                buttons: virtualGamepadState.buttons.map(val => ({ pressed: val === 1, value: val }))
+            };
+
+            // Return our custom array with the phantom gamepad in the first slot
+            return [fakeGamepad, null, null, null];
+        };
 
         async function initEmulator() {
             try {
                 const absoluteRomUrl = new URL(ROM_FILENAME, window.location.href).href;
 
-                emulator = await Nostalgist.launch({
+                // Dispatch event so the emulator listens to the phantom controller immediately
+                window.dispatchEvent(new Event('gamepadconnected'));
+
+                await Nostalgist.launch({
                     core: 'snes9x',
                     rom: absoluteRomUrl
                 });
@@ -220,41 +244,26 @@
             const buttons = document.querySelectorAll('.btn');
 
             buttons.forEach(button => {
-                const buttonName = button.getAttribute('data-button');
-                if (!buttonName) return;
+                const indexStr = button.getAttribute('data-gamepad-index');
+                if (!indexStr) return;
+                const index = parseInt(indexStr);
 
-                // When user touches the button
+                // Hold down touch flip active bit
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    if (!emulator) return;
-
-                    // Immediately trigger a single click
-                    emulator.press({ button: buttonName });
-
-                    // Set an interval to fire a click every 16ms to simulate a "hold"
-                    if (!activeLoops[buttonName]) {
-                        activeLoops[buttonName] = setInterval(() => {
-                            emulator.press({ button: buttonName });
-                        }, 16);
-                    }
+                    virtualGamepadState.buttons[index] = 1;
                 });
 
-                // When user lets go of the button
+                // Release touch resets bit
                 button.addEventListener('touchend', (e) => {
                     e.preventDefault();
-                    if (activeLoops[buttonName]) {
-                        clearInterval(activeLoops[buttonName]);
-                        delete activeLoops[buttonName];
-                    }
+                    virtualGamepadState.buttons[index] = 0;
                 });
                 
                 // Backup for dragging finger off the button
                 button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
-                    if (activeLoops[buttonName]) {
-                        clearInterval(activeLoops[buttonName]);
-                        delete activeLoops[buttonName];
-                    }
+                    virtualGamepadState.buttons[index] = 0;
                 });
             });
         }
