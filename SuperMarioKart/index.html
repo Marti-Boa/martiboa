@@ -1,1 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SFC Player - GitHub Pages</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        h1 { 
+            margin-bottom: 5px; 
+            color: #fff;
+        }
+        p {
+            margin-top: 0;
+            color: #888;
+            font-size: 14px;
+        }
+        #emulator-container {
+            width: 640px;
+            height: 480px;
+            background-color: #000;
+            border: 3px solid #2c2c2c;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #instructions {
+            margin-top: 20px;
+            background: #1a1a1a;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        table { color: #aaa; font-size: 14px; border-collapse: collapse; }
+        td { padding: 5px 15px; }
+        strong { color: #00bc8c; }
+    </style>
 
+    <script src="https://cdn.jsdelivr.net/npm/nostalgist@latest/dist/nostalgist.umd.js"></script>
+</head>
+<body>
+
+    <h1>Web SFC Player</h1>
+    <p>Loading game directly from your GitHub repository...</p>
+    
+    <div id="emulator-container"></div>
+
+    <div id="instructions">
+        <table>
+            <tr><td><strong>D-Pad:</strong> Arrow Keys</td><td><strong>A / B Buttons:</strong> X / Z</td></tr>
+            <tr><td><strong>X / Y Buttons:</strong> S / A</td><td><strong>L / R Bumpers:</strong> Q / W</td></tr>
+            <tr><td><strong>Start:</strong> Enter</td><td><strong>Select:</strong> Shift</td></tr>
+        </table>
+    </div>
+
+    <script>
+        // REPLACE THIS with the exact filename of your ROM on GitHub
+        const ROM_FILENAME = 'super-mario-kart.sfc'; 
+
+        async function initEmulator() {
+            try {
+                await Nostalgist.launch({
+                    element: '#emulator-container',
+                    core: 'snes9x',
+                    rom: ROM_FILENAME // Since the ROM is beside index.html, we just use the file name!
+                });
+            } catch (error) {
+                console.error("Failed to load emulator or ROM:", error);
+                document.querySelector('p').innerHTML = "<span style='color: #ff4a4a;'>Failed to load game. Check the filename in your code!</span>";
+            }
+        }
+
+        // Run the emulator when the page loads
+        window.addEventListener('DOMContentLoaded', initEmulator);
+    </script>
+</body>
+</html>
