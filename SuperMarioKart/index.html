@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SFC Player - GitHub Pages</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>SFC Player with Touch Controls</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -15,16 +15,19 @@
             justify-content: center;
             min-height: 100vh;
             margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
         }
-        h1 { 
-            margin-bottom: 5px; 
-            color: #fff;
+        
+        /* Container that scales automatically */
+        #game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 640px;
         }
-        p {
-            margin-top: 0;
-            color: #888;
-            font-size: 14px;
-        }
+
         #emulator-container {
             width: 640px;
             height: 480px;
@@ -34,53 +37,202 @@
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        #instructions {
-            margin-top: 20px;
-            background: #1a1a1a;
-            padding: 15px 25px;
-            border-radius: 8px;
-            border: 1px solid #333;
+
+        /* Mobile adjustments for the screen */
+        @media (max-width: 660px) {
+            #emulator-container {
+                width: 100vw;
+                height: 75vw; /* Maintain 4:3 aspect ratio */
+                border: none;
+                border-radius: 0;
+            }
         }
-        table { color: #aaa; font-size: 14px; border-collapse: collapse; }
-        td { padding: 5px 15px; }
-        strong { color: #00bc8c; }
+
+        /* --- Touch Controls CSS --- */
+        #touch-controls {
+            display: none; /* Hidden by default on desktop */
+            width: 100%;
+            user-select: none;
+            background: #1a1a1a;
+            padding: 15px 0;
+            border-top: 2px solid #333;
+        }
+
+        @media (max-width: 1024px) {
+            #touch-controls {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            width: 100%;
+        }
+
+        .btn {
+            background-color: #333;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 4px 0 #1a1a1a;
+            active-action: none;
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #1a1a1a;
+            background-color: #444;
+        }
+
+        /* D-PAD */
+        .dpad {
+            position: relative;
+            width: 130px;
+            height: 130px;
+        }
+        .dpad-btn {
+            position: absolute;
+            background: #2b2b2b;
+            width: 42px;
+            height: 42px;
+            border-radius: 5px;
+        }
+        .dpad-up { top: 0; left: 44px; }
+        .dpad-down { bottom: 0; left: 44px; }
+        .dpad-left { top: 44px; left: 0; }
+        .dpad-right { top: 44px; right: 0; }
+        .dpad-center { top: 44px; left: 44px; background: #222; border-radius: 0; }
+
+        /* Action Buttons */
+        .action-group {
+            position: relative;
+            width: 130px;
+            height: 130px;
+        }
+        .abxy {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+        }
+        .btn-y { top: 45px; left: 0; background: #ffcc00; color: #000;}
+        .btn-x { top: 0; left: 45px; background: #3399ff; }
+        .btn-b { bottom: 0; left: 45px; background: #ff3333; }
+        .btn-a { top: 45px; right: 0; background: #00cc66; }
+
+        /* System Buttons (Select / Start) */
+        .pill-btn {
+            background: #333;
+            width: 65px;
+            height: 25px;
+            border-radius: 15px;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        /* L & R Bumpers */
+        .bumper {
+            width: 70px;
+            height: 35px;
+            border-radius: 5px;
+            background: #444;
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/nostalgist@latest/dist/nostalgist.umd.js"></script>
 </head>
 <body>
 
-    <h1>Web SFC Player</h1>
-    <p>Loading game directly from your GitHub repository...</p>
-    
-    <div id="emulator-container"></div>
+    <div id="game-wrapper">
+        <div id="emulator-container"></div>
+        
+        <div id="touch-controls">
+            <div class="row">
+                <div class="btn bumper" data-key="q">L</div>
+                <div class="btn bumper" data-key="w">R</div>
+            </div>
 
-    <div id="instructions">
-        <table>
-            <tr><td><strong>D-Pad:</strong> Arrow Keys</td><td><strong>A / B Buttons:</strong> X / Z</td></tr>
-            <tr><td><strong>X / Y Buttons:</strong> S / A</td><td><strong>L / R Bumpers:</strong> Q / W</td></tr>
-            <tr><td><strong>Start:</strong> Enter</td><td><strong>Select:</strong> Shift</td></tr>
-        </table>
+            <div class="row">
+                <div class="dpad">
+                    <div class="btn dpad-btn dpad-up" data-key="ArrowUp">↑</div>
+                    <div class="btn dpad-btn dpad-down" data-key="ArrowDown">↓</div>
+                    <div class="btn dpad-btn dpad-left" data-key="ArrowLeft">←</div>
+                    <div class="btn dpad-btn dpad-right" data-key="ArrowRight">→</div>
+                    <div class="dpad-btn dpad-center"></div>
+                </div>
+
+                <div class="action-group">
+                    <div class="btn abxy btn-x" data-key="s">X</div>
+                    <div class="btn abxy btn-y" data-key="a">Y</div>
+                    <div class="btn abxy btn-a" data-key="x">A</div>
+                    <div class="btn abxy btn-b" data-key="z">B</div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="btn pill-btn" data-key="Shift">Select</div>
+                <div class="btn pill-btn" data-key="Enter">Start</div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // REPLACE THIS with the exact filename of your ROM on GitHub
+        // Filename in your repo
         const ROM_FILENAME = 'super-mario-kart.sfc'; 
 
         async function initEmulator() {
             try {
+                // Generates an unbreakable absolute URL for GitHub Pages
+                const absoluteRomUrl = new URL(ROM_FILENAME, window.location.href).href;
+
                 await Nostalgist.launch({
                     element: '#emulator-container',
                     core: 'snes9x',
-                    rom: ROM_FILENAME // Since the ROM is beside index.html, we just use the file name!
+                    rom: absoluteRomUrl
                 });
+                
+                setupTouchEvents();
             } catch (error) {
-                console.error("Failed to load emulator or ROM:", error);
-                document.querySelector('p').innerHTML = "<span style='color: #ff4a4a;'>Failed to load game. Check the filename in your code!</span>";
+                console.error("Failed to load emulator:", error);
+                alert("Error loading ROM: " + error.message);
             }
         }
 
-        // Run the emulator when the page loads
+        // Simulates keyboard presses when touch buttons are hit
+        function setupTouchEvents() {
+            const buttons = document.querySelectorAll('.btn');
+
+            buttons.forEach(button => {
+                const key = button.getAttribute('data-key');
+                if (!key) return;
+
+                // When user touches the button
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    window.dispatchEvent(new KeyboardEvent('keydown', { key: key }));
+                });
+
+                // When user stops touching the button
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
+                });
+                
+                // Backup for dragging finger off button
+                button.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
+                });
+            });
+        }
+
         window.addEventListener('DOMContentLoaded', initEmulator);
     </script>
 </body>
