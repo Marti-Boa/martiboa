@@ -27,7 +27,6 @@
             max-width: 640px;
         }
 
-        /* 1. This holds the screen area and handles sizing */
         #canvas-holder {
             width: 640px;
             height: 480px;
@@ -39,7 +38,6 @@
             position: relative;
         }
 
-        /* 2. This forces the emulator canvas to fill the entire box! */
         #canvas-holder canvas {
             width: 100% !important;
             height: 100% !important;
@@ -48,11 +46,10 @@
             left: 0 !important;
         }
 
-        /* Mobile adjustments for the screen holder */
         @media (max-width: 660px) {
             #canvas-holder {
                 width: 100vw;
-                height: 75vw; /* Maintain 4:3 aspect ratio */
+                height: 75vw;
                 border: none;
                 border-radius: 0;
             }
@@ -60,7 +57,7 @@
 
         /* --- Touch Controls CSS --- */
         #touch-controls {
-            display: flex !important; /* FORCED visible on all screens (including iPads) */
+            display: flex !important;
             flex-direction: column;
             gap: 15px;
             width: 100%;
@@ -161,48 +158,48 @@
         
         <div id="touch-controls">
             <div class="row">
-                <div class="btn bumper" data-key="q">L</div>
-                <div class="btn bumper" data-key="w">R</div>
+                <div class="btn bumper" data-button="l">L</div>
+                <div class="btn bumper" data-button="r">R</div>
             </div>
 
             <div class="row">
                 <div class="dpad">
-                    <div class="btn dpad-btn dpad-up" data-key="ArrowUp">↑</div>
-                    <div class="btn dpad-btn dpad-down" data-key="ArrowDown">↓</div>
-                    <div class="btn dpad-btn dpad-left" data-key="ArrowLeft">←</div>
-                    <div class="btn dpad-btn dpad-right" data-key="ArrowRight">→</div>
+                    <div class="btn dpad-btn dpad-up" data-button="up">↑</div>
+                    <div class="btn dpad-btn dpad-down" data-button="down">↓</div>
+                    <div class="btn dpad-btn dpad-left" data-button="left">←</div>
+                    <div class="btn dpad-btn dpad-right" data-button="right">→</div>
                     <div class="dpad-btn dpad-center"></div>
                 </div>
 
                 <div class="action-group">
-                    <div class="btn abxy btn-x" data-key="s">X</div>
-                    <div class="btn abxy btn-y" data-key="a">Y</div>
-                    <div class="btn abxy btn-a" data-key="x">A</div>
-                    <div class="btn abxy btn-b" data-key="z">B</div>
+                    <div class="btn abxy btn-x" data-button="x">X</div>
+                    <div class="btn abxy btn-y" data-button="y">Y</div>
+                    <div class="btn abxy btn-a" data-button="a">A</div>
+                    <div class="btn abxy btn-b" data-button="b">B</div>
                 </div>
             </div>
 
             <div class="row">
-                <div class="btn pill-btn" data-key="Shift">Select</div>
-                <div class="btn pill-btn" data-key="Enter">Start</div>
+                <div class="btn pill-btn" data-button="select">Select</div>
+                <div class="btn pill-btn" data-button="start">Start</div>
             </div>
         </div>
     </div>
 
     <script>
         const ROM_FILENAME = 'super-mario-kart.sfc'; 
+        let emulator = null;
 
         async function initEmulator() {
             try {
                 const absoluteRomUrl = new URL(ROM_FILENAME, window.location.href).href;
 
-                // We don't pass 'element' anymore. Nostalgist builds its own canvas!
-                const nostalgist = await Nostalgist.launch({
+                // We store the emulator instance in a global variable
+                emulator = await Nostalgist.launch({
                     core: 'snes9x',
                     rom: absoluteRomUrl
                 });
                 
-                // We find the canvas Nostalgist just made and move it inside our holder box
                 const canvas = document.querySelector('canvas');
                 if (canvas) {
                     document.getElementById('canvas-holder').appendChild(canvas);
@@ -219,22 +216,33 @@
             const buttons = document.querySelectorAll('.btn');
 
             buttons.forEach(button => {
-                const key = button.getAttribute('data-key');
-                if (!key) return;
+                const buttonName = button.getAttribute('data-button');
+                if (!buttonName) return;
 
-                button.addEventListener('touchstart', (e) => {
+                // When user touches the button
+                button.addEventListener('touchstart', async (e) => {
                     e.preventDefault();
-                    window.dispatchEvent(new KeyboardEvent('keydown', { key: key }));
+                    if (emulator) {
+                        // Directly force the emulator to hold the SNES button!
+                        await emulator.press({ button: buttonName, isPressed: true });
+                    }
                 });
 
-                button.addEventListener('touchend', (e) => {
+                // When user lets go of the button
+                button.addEventListener('touchend', async (e) => {
                     e.preventDefault();
-                    window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
+                    if (emulator) {
+                        // Directly force the emulator to let go of the SNES button!
+                        await emulator.press({ button: buttonName, isPressed: false });
+                    }
                 });
                 
-                button.addEventListener('touchcancel', (e) => {
+                // Backup for dragging finger off the button
+                button.addEventListener('touchcancel', async (e) => {
                     e.preventDefault();
-                    window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
+                    if (emulator) {
+                        await emulator.press({ button: buttonName, isPressed: false });
+                    }
                 });
             });
         }
