@@ -130,7 +130,7 @@
         .btn-b { bottom: 0; left: 45px; background: #ff3333; }
         .btn-a { top: 45px; right: 0; background: #00cc66; }
 
-        /* System Buttons (Select / Start) */
+        /* System Buttons (Select / Start) moved to top center */
         .pill-btn {
             background: #333;
             width: 65px;
@@ -147,6 +147,12 @@
             border-radius: 5px;
             background: #444;
         }
+        
+        /* Helper class for grouping start/select in center */
+        .center-pills {
+            display: flex;
+            gap: 10px;
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/nostalgist@latest/dist/nostalgist.umd.js"></script>
@@ -158,44 +164,41 @@
         
         <div id="touch-controls">
             <div class="row">
-                <div class="btn bumper" data-button="l">L</div>
-                <div class="btn bumper" data-button="r">R</div>
+                <div class="btn bumper" data-key="q">L</div>
+                <div class="center-pills">
+                    <div class="btn pill-btn" data-key="Shift">Select</div>
+                    <div class="btn pill-btn" data-key="Enter">Start</div>
+                </div>
+                <div class="btn bumper" data-key="w">R</div>
             </div>
 
             <div class="row">
                 <div class="dpad">
-                    <div class="btn dpad-btn dpad-up" data-button="up">↑</div>
-                    <div class="btn dpad-btn dpad-down" data-button="down">↓</div>
-                    <div class="btn dpad-btn dpad-left" data-button="left">←</div>
-                    <div class="btn dpad-btn dpad-right" data-button="right">→</div>
+                    <div class="btn dpad-btn dpad-up" data-key="ArrowUp">↑</div>
+                    <div class="btn dpad-btn dpad-down" data-key="ArrowDown">↓</div>
+                    <div class="btn dpad-btn dpad-left" data-key="ArrowLeft">←</div>
+                    <div class="btn dpad-btn dpad-right" data-key="ArrowRight">→</div>
                     <div class="dpad-btn dpad-center"></div>
                 </div>
 
                 <div class="action-group">
-                    <div class="btn abxy btn-x" data-button="x">X</div>
-                    <div class="btn abxy btn-y" data-button="y">Y</div>
-                    <div class="btn abxy btn-a" data-button="a">A</div>
-                    <div class="btn abxy btn-b" data-button="b">B</div>
+                    <div class="btn abxy btn-x" data-key="s">X</div>
+                    <div class="btn abxy btn-y" data-key="a">Y</div>
+                    <div class="btn abxy btn-a" data-key="x">A</div>
+                    <div class="btn abxy btn-b" data-key="z">B</div>
                 </div>
-            </div>
-
-            <div class="row">
-                <div class="btn pill-btn" data-button="select">Select</div>
-                <div class="btn pill-btn" data-button="start">Start</div>
             </div>
         </div>
     </div>
 
     <script>
         const ROM_FILENAME = 'super-mario-kart.sfc'; 
-        let emulator = null;
 
         async function initEmulator() {
             try {
                 const absoluteRomUrl = new URL(ROM_FILENAME, window.location.href).href;
 
-                // We store the emulator instance in a global variable
-                emulator = await Nostalgist.launch({
+                await Nostalgist.launch({
                     core: 'snes9x',
                     rom: absoluteRomUrl
                 });
@@ -216,33 +219,40 @@
             const buttons = document.querySelectorAll('.btn');
 
             buttons.forEach(button => {
-                const buttonName = button.getAttribute('data-button');
-                if (!buttonName) return;
+                const key = button.getAttribute('data-key');
+                if (!key) return;
 
-                // When user touches the button
-                button.addEventListener('touchstart', async (e) => {
+                // Fire an official keyboard event on touch start
+                button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    if (emulator) {
-                        // Directly force the emulator to hold the SNES button!
-                        await emulator.press({ button: buttonName, isPressed: true });
-                    }
+                    window.dispatchEvent(new KeyboardEvent('keydown', {
+                        key: key,
+                        code: key,
+                        bubbles: true,
+                        cancelable: true
+                    }));
                 });
 
-                // When user lets go of the button
-                button.addEventListener('touchend', async (e) => {
+                // Fire an official keyboard event release on touch end
+                button.addEventListener('touchend', (e) => {
                     e.preventDefault();
-                    if (emulator) {
-                        // Directly force the emulator to let go of the SNES button!
-                        await emulator.press({ button: buttonName, isPressed: false });
-                    }
+                    window.dispatchEvent(new KeyboardEvent('keyup', {
+                        key: key,
+                        code: key,
+                        bubbles: true,
+                        cancelable: true
+                    }));
                 });
                 
                 // Backup for dragging finger off the button
-                button.addEventListener('touchcancel', async (e) => {
+                button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
-                    if (emulator) {
-                        await emulator.press({ button: buttonName, isPressed: false });
-                    }
+                    window.dispatchEvent(new KeyboardEvent('keyup', {
+                        key: key,
+                        code: key,
+                        bubbles: true,
+                        cancelable: true
+                    }));
                 });
             });
         }
