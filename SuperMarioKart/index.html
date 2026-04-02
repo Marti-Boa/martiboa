@@ -19,7 +19,6 @@
             touch-action: manipulation;
         }
         
-        /* Container that scales automatically */
         #game-wrapper {
             display: flex;
             flex-direction: column;
@@ -28,8 +27,8 @@
             max-width: 640px;
         }
 
-        /* Crucial fix: This is now a canvas element */
-        #emulator-container {
+        /* 1. We wrap the canvas in a protective div */
+        .canvas-holder {
             width: 640px;
             height: 480px;
             background-color: #000;
@@ -37,11 +36,19 @@
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
         }
 
-        /* Mobile adjustments for the screen */
+        /* 2. We FORCE the canvas to take up the full holder, ignoring Nostalgist's injection */
+        #emulator-container {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+
+        /* Mobile adjustments for the screen holder */
         @media (max-width: 660px) {
-            #emulator-container {
+            .canvas-holder {
                 width: 100vw;
                 height: 75vw; /* Maintain 4:3 aspect ratio */
                 border: none;
@@ -51,7 +58,7 @@
 
         /* --- Touch Controls CSS --- */
         #touch-controls {
-            display: none; /* Hidden by default on desktop */
+            display: none; /* Hidden by default on desktop monitors */
             width: 100%;
             user-select: none;
             background: #1a1a1a;
@@ -59,9 +66,10 @@
             border-top: 2px solid #333;
         }
 
+        /* 3. Forces the controls to appear on any mobile device or smaller screen */
         @media (max-width: 1024px) {
             #touch-controls {
-                display: flex;
+                display: flex !important;
                 flex-direction: column;
                 gap: 15px;
             }
@@ -83,7 +91,7 @@
             justify-content: center;
             font-weight: bold;
             box-shadow: 0 4px 0 #1a1a1a;
-            active-action: none;
+            user-select: none;
         }
 
         .btn:active {
@@ -152,7 +160,9 @@
 <body>
 
     <div id="game-wrapper">
-        <canvas id="emulator-container"></canvas>
+        <div class="canvas-holder">
+            <canvas id="emulator-container"></canvas>
+        </div>
         
         <div id="touch-controls">
             <div class="row">
@@ -194,9 +204,7 @@
                 await Nostalgist.launch({
                     element: '#emulator-container',
                     core: 'snes9x',
-                    rom: absoluteRomUrl,
-                    // We feed the size manually to prevent Nostalgist from overriding our CSS
-                    size: { width: 640, height: 480 }
+                    rom: absoluteRomUrl
                 });
                 
                 setupTouchEvents();
