@@ -130,7 +130,7 @@
         .btn-b { bottom: 0; left: 45px; background: #ff3333; }
         .btn-a { top: 45px; right: 0; background: #00cc66; }
 
-        /* System Buttons (Select / Start) moved to top center */
+        /* System Buttons moved to top center */
         .pill-btn {
             background: #333;
             width: 65px;
@@ -148,7 +148,6 @@
             background: #444;
         }
         
-        /* Helper class for grouping start/select in center */
         .center-pills {
             display: flex;
             gap: 10px;
@@ -164,28 +163,28 @@
         
         <div id="touch-controls">
             <div class="row">
-                <div class="btn bumper" data-key="q">L</div>
+                <div class="btn bumper" data-button="l">L</div>
                 <div class="center-pills">
-                    <div class="btn pill-btn" data-key="Shift">Select</div>
-                    <div class="btn pill-btn" data-key="Enter">Start</div>
+                    <div class="btn pill-btn" data-button="select">Select</div>
+                    <div class="btn pill-btn" data-button="start">Start</div>
                 </div>
-                <div class="btn bumper" data-key="w">R</div>
+                <div class="btn bumper" data-button="r">R</div>
             </div>
 
             <div class="row">
                 <div class="dpad">
-                    <div class="btn dpad-btn dpad-up" data-key="ArrowUp">↑</div>
-                    <div class="btn dpad-btn dpad-down" data-key="ArrowDown">↓</div>
-                    <div class="btn dpad-btn dpad-left" data-key="ArrowLeft">←</div>
-                    <div class="btn dpad-btn dpad-right" data-key="ArrowRight">→</div>
+                    <div class="btn dpad-btn dpad-up" data-button="up">↑</div>
+                    <div class="btn dpad-btn dpad-down" data-button="down">↓</div>
+                    <div class="btn dpad-btn dpad-left" data-button="left">←</div>
+                    <div class="btn dpad-btn dpad-right" data-button="right">→</div>
                     <div class="dpad-btn dpad-center"></div>
                 </div>
 
                 <div class="action-group">
-                    <div class="btn abxy btn-x" data-key="s">X</div>
-                    <div class="btn abxy btn-y" data-key="a">Y</div>
-                    <div class="btn abxy btn-a" data-key="x">A</div>
-                    <div class="btn abxy btn-b" data-key="z">B</div>
+                    <div class="btn abxy btn-x" data-button="x">X</div>
+                    <div class="btn abxy btn-y" data-button="y">Y</div>
+                    <div class="btn abxy btn-a" data-button="a">A</div>
+                    <div class="btn abxy btn-b" data-button="b">B</div>
                 </div>
             </div>
         </div>
@@ -193,12 +192,14 @@
 
     <script>
         const ROM_FILENAME = 'super-mario-kart.sfc'; 
+        let emulator = null;
+        let activeLoops = {}; // Stores intervals for holding buttons
 
         async function initEmulator() {
             try {
                 const absoluteRomUrl = new URL(ROM_FILENAME, window.location.href).href;
 
-                await Nostalgist.launch({
+                emulator = await Nostalgist.launch({
                     core: 'snes9x',
                     rom: absoluteRomUrl
                 });
@@ -219,40 +220,41 @@
             const buttons = document.querySelectorAll('.btn');
 
             buttons.forEach(button => {
-                const key = button.getAttribute('data-key');
-                if (!key) return;
+                const buttonName = button.getAttribute('data-button');
+                if (!buttonName) return;
 
-                // Fire an official keyboard event on touch start
+                // When user touches the button
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    window.dispatchEvent(new KeyboardEvent('keydown', {
-                        key: key,
-                        code: key,
-                        bubbles: true,
-                        cancelable: true
-                    }));
+                    if (!emulator) return;
+
+                    // Immediately trigger a single click
+                    emulator.press({ button: buttonName });
+
+                    // Set an interval to fire a click every 16ms to simulate a "hold"
+                    if (!activeLoops[buttonName]) {
+                        activeLoops[buttonName] = setInterval(() => {
+                            emulator.press({ button: buttonName });
+                        }, 16);
+                    }
                 });
 
-                // Fire an official keyboard event release on touch end
+                // When user lets go of the button
                 button.addEventListener('touchend', (e) => {
                     e.preventDefault();
-                    window.dispatchEvent(new KeyboardEvent('keyup', {
-                        key: key,
-                        code: key,
-                        bubbles: true,
-                        cancelable: true
-                    }));
+                    if (activeLoops[buttonName]) {
+                        clearInterval(activeLoops[buttonName]);
+                        delete activeLoops[buttonName];
+                    }
                 });
                 
                 // Backup for dragging finger off the button
                 button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
-                    window.dispatchEvent(new KeyboardEvent('keyup', {
-                        key: key,
-                        code: key,
-                        bubbles: true,
-                        cancelable: true
-                    }));
+                    if (activeLoops[buttonName]) {
+                        clearInterval(activeLoops[buttonName]);
+                        delete activeLoops[buttonName];
+                    }
                 });
             });
         }
