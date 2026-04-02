@@ -28,6 +28,7 @@
             max-width: 640px;
         }
 
+        /* Crucial fix: This is now a canvas element */
         #emulator-container {
             width: 640px;
             height: 480px;
@@ -151,7 +152,7 @@
 <body>
 
     <div id="game-wrapper">
-        <div id="emulator-container"></div>
+        <canvas id="emulator-container"></canvas>
         
         <div id="touch-controls">
             <div class="row">
@@ -184,18 +185,18 @@
     </div>
 
     <script>
-        // Filename in your repo
         const ROM_FILENAME = 'super-mario-kart.sfc'; 
 
         async function initEmulator() {
             try {
-                // Generates an unbreakable absolute URL for GitHub Pages
                 const absoluteRomUrl = new URL(ROM_FILENAME, window.location.href).href;
 
                 await Nostalgist.launch({
                     element: '#emulator-container',
                     core: 'snes9x',
-                    rom: absoluteRomUrl
+                    rom: absoluteRomUrl,
+                    // We feed the size manually to prevent Nostalgist from overriding our CSS
+                    size: { width: 640, height: 480 }
                 });
                 
                 setupTouchEvents();
@@ -205,7 +206,6 @@
             }
         }
 
-        // Simulates keyboard presses when touch buttons are hit
         function setupTouchEvents() {
             const buttons = document.querySelectorAll('.btn');
 
@@ -213,19 +213,16 @@
                 const key = button.getAttribute('data-key');
                 if (!key) return;
 
-                // When user touches the button
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     window.dispatchEvent(new KeyboardEvent('keydown', { key: key }));
                 });
 
-                // When user stops touching the button
                 button.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
                 });
                 
-                // Backup for dragging finger off button
                 button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
                     window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
