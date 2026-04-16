@@ -67,7 +67,7 @@ ENTER CODE
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getDatabase, ref, set, update, onValue }
+import { getDatabase, ref, update }
 from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
 const firebaseConfig = {
@@ -88,43 +88,15 @@ const log = document.getElementById("log");
 const input = document.getElementById("input");
 
 let booted = false;
-let time = 108 * 60;
 
 const CODE = "4 8 15 16 23 42";
 
-function push(data){
-  update(stateRef, data);
+function startCycle() {
+  update(stateRef, {
+    status: "active",
+    endTime: Date.now() + (108 * 60 * 1000)
+  });
 }
-
-/* sync */
-onValue(stateRef, (snap) => {
-  const d = snap.val();
-  if (!d) return;
-
-  time = d.time ?? time;
-
-  if (d.status === "failure") {
-    log.innerText += "\nSYSTEM FAILURE";
-  }
-});
-
-/* countdown */
-setInterval(() => {
-  if (!booted) return;
-
-  time--;
-
-  push({ time });
-
-  if (time <= 0) {
-    push({ status: "failure" });
-  }
-
-  if (time === 240) {
-    log.innerText += "\nRESTRICTIONS LIFTING";
-  }
-
-}, 1000);
 
 input.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
@@ -134,33 +106,19 @@ input.addEventListener("keydown", (e) => {
 
   log.innerText += "\n█ " + v;
 
-  /* BOOT */
   if (!booted) {
     booted = true;
-
-    push({
-      booted: true,
-      running: true,
-      status: "active",
-      time: 108 * 60
-    });
-
+    startCycle();
     log.innerText += "\nSYSTEM INITIALIZED";
     return;
   }
 
-  /* RESET */
   if (v === CODE) {
-    push({
-      time: 108 * 60,
-      status: "active"
-    });
-
+    startCycle();
     log.innerText += "\nSYSTEM RESET";
-    return;
+  } else {
+    log.innerText += "\nINVALID ENTRY";
   }
-
-  log.innerText += "\nINVALID ENTRY";
 });
 </script>
 
