@@ -67,9 +67,14 @@ ENTER CODE
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getDatabase, ref, update }
-from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+import {
+  getDatabase,
+  ref,
+  update,
+  onValue
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
+/* 🔥 FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyByAJ_lafYdkTrNoTbs2V4m8-yOs1t8vwA",
   authDomain: "squirrelnews-53a89.firebaseapp.com",
@@ -87,17 +92,31 @@ const stateRef = ref(db, "swan/state");
 const log = document.getElementById("log");
 const input = document.getElementById("input");
 
-let booted = false;
-
 const CODE = "4 8 15 16 23 42";
 
-function startCycle() {
-  update(stateRef, {
-    status: "active",
-    endTime: Date.now() + (108 * 60 * 1000)
-  });
-}
+let state = {};
+let syncedOnce = false;
 
+/* 🛰 LIVE SYNC */
+onValue(stateRef, (snap) => {
+  const d = snap.val();
+  if (!d) return;
+
+  state = d;
+
+  /* ONLY show join message once per tab */
+  if (d.status === "active" && !syncedOnce) {
+    syncedOnce = true;
+    log.innerText += "\nSYSTEM LINKED";
+    log.innerText += "\nSYNCING TO SWAN CORE";
+  }
+
+  if (d.status === "failure") {
+    log.innerText += "\nSYSTEM FAILURE";
+  }
+});
+
+/* ⌨️ INPUT */
 input.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
 
@@ -106,19 +125,23 @@ input.addEventListener("keydown", (e) => {
 
   log.innerText += "\n█ " + v;
 
-  if (!booted) {
-    booted = true;
-    startCycle();
-    log.innerText += "\nSYSTEM INITIALIZED";
+  /* RESET / START CYCLE */
+  if (v === CODE) {
+    update(stateRef, {
+      status: "active",
+      endTime: Date.now() + (108 * 60 * 1000)
+    });
+
+    log.innerText += "\nSYSTEM RESET";
     return;
   }
 
-  if (v === CODE) {
-    startCycle();
-    log.innerText += "\nSYSTEM RESET";
-  } else {
-    log.innerText += "\nINVALID ENTRY";
+  if (v === "status") {
+    log.innerText += "\nSTATE: " + (state.status || "unknown");
+    return;
   }
+
+  log.innerText += "\nINVALID ENTRY";
 });
 </script>
 
