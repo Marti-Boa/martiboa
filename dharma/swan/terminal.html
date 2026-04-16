@@ -55,10 +55,7 @@ html, body {
 
 <body>
 
-<div id="log">
-SYSTEM OFFLINE
-ENTER CODE
-</div>
+<div id="log">SYSTEM BOOTING...</div>
 
 <div id="bar">
   <span id="cursor">█</span>
@@ -74,7 +71,6 @@ import {
   onValue
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-/* 🔥 FIREBASE */
 const firebaseConfig = {
   apiKey: "AIzaSyByAJ_lafYdkTrNoTbs2V4m8-yOs1t8vwA",
   authDomain: "squirrelnews-53a89.firebaseapp.com",
@@ -104,11 +100,15 @@ onValue(stateRef, (snap) => {
 
   state = d;
 
-  /* ONLY show join message once per tab */
-  if (d.status === "active" && !syncedOnce) {
+  /* 🔥 dynamic system status display */
+  if (!syncedOnce) {
     syncedOnce = true;
-    log.innerText += "\nSYSTEM LINKED";
-    log.innerText += "\nSYNCING TO SWAN CORE";
+
+    if (d.status === "active") {
+      log.innerText = "SYSTEM ONLINE";
+    } else {
+      log.innerText = "SYSTEM OFFLINE";
+    }
   }
 
   if (d.status === "failure") {
