@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>SWAN FLAP DISPLAY</title>
+<title>SWAN FLAP</title>
 
 <style>
 html, body {
@@ -48,24 +48,35 @@ const stateRef = ref(db, "swan/state");
 
 const flap = document.getElementById("flap");
 
+let endTime = Date.now() + (108 * 60 * 1000);
+let status = "active";
+
 onValue(stateRef, (snap) => {
   const d = snap.val();
   if (!d) return;
 
-  if (d.status === "failure") {
+  if (d.endTime) endTime = d.endTime;
+  status = d.status;
+});
+
+function format(t) {
+  let m = Math.floor(t / 60);
+  let s = t % 60;
+  return String(m).padStart(3, "0") + ":" + String(s).padStart(2, "0");
+}
+
+setInterval(() => {
+  let remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+
+  if (status === "failure" || remaining <= 0) {
     flap.innerText = "ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ";
     document.body.style.color = "#ff0000";
     return;
   }
 
-  let t = d.time ?? 0;
-  let m = Math.floor(t / 60);
-  let s = t % 60;
+  flap.innerText = format(remaining);
 
-  flap.innerText =
-    String(m).padStart(3,"0") + ":" +
-    String(s).padStart(2,"0");
-});
+}, 1000);
 </script>
 
 </body>
