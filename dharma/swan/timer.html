@@ -1,1 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SWAN FLAP DISPLAY</title>
 
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #39ff88;
+  font-family: monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 80px;
+}
+
+#flap {
+  letter-spacing: 6px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="flap">108:00</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getDatabase, ref, onValue }
+from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyByAJ_lafYdkTrNoTbs2V4m8-yOs1t8vwA",
+  authDomain: "squirrelnews-53a89.firebaseapp.com",
+  databaseURL: "https://squirrelnews-53a89-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "squirrelnews-53a89",
+  storageBucket: "squirrelnews-53a89.appspot.com",
+  messagingSenderId: "521720919624",
+  appId: "1:521720919624:web:66e3b151eb4ef37ce7ca7d"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const stateRef = ref(db, "swan/state");
+
+const flap = document.getElementById("flap");
+
+onValue(stateRef, (snap) => {
+  const d = snap.val();
+  if (!d) return;
+
+  if (d.status === "failure") {
+    flap.innerText = "ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ";
+    document.body.style.color = "#ff0000";
+    return;
+  }
+
+  let t = d.time ?? 0;
+  let m = Math.floor(t / 60);
+  let s = t % 60;
+
+  flap.innerText =
+    String(m).padStart(3,"0") + ":" +
+    String(s).padStart(2,"0");
+});
+</script>
+
+</body>
+</html>
