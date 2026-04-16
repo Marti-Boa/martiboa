@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SWAN TERMINAL</title>
+
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #39ff88;
+  font-family: monospace;
+  overflow: hidden;
+}
+
+#log {
+  position: fixed;
+  top: 0;
+  bottom: 40px;
+  left: 0;
+  right: 0;
+  padding: 10px;
+  white-space: pre-wrap;
+}
+
+#bar {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  padding: 6px 10px;
+  border-top: 1px solid rgba(0,255,120,0.2);
+}
+
+#cursor {
+  animation: blink 0.8s infinite;
+  margin-right: 6px;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+#input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #39ff88;
+  font-family: monospace;
+}
+</style>
+</head>
+
+<body>
+
+<div id="log">
+SYSTEM OFFLINE
+ENTER CODE
+</div>
+
+<div id="bar">
+  <span id="cursor">█</span>
+  <input id="input" autocomplete="off" autofocus />
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getDatabase, ref, set, update, onValue }
+from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyByAJ_lafYdkTrNoTbs2V4m8-yOs1t8vwA",
+  authDomain: "squirrelnews-53a89.firebaseapp.com",
+  databaseURL: "https://squirrelnews-53a89-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "squirrelnews-53a89",
+  storageBucket: "squirrelnews-53a89.appspot.com",
+  messagingSenderId: "521720919624",
+  appId: "1:521720919624:web:66e3b151eb4ef37ce7ca7d"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const stateRef = ref(db, "swan/state");
+
+const log = document.getElementById("log");
+const input = document.getElementById("input");
+
+let booted = false;
+let time = 108 * 60;
+
+const CODE = "4 8 15 16 23 42";
+
+function push(data){
+  update(stateRef, data);
+}
+
+/* sync */
+onValue(stateRef, (snap) => {
+  const d = snap.val();
+  if (!d) return;
+
+  time = d.time ?? time;
+
+  if (d.status === "failure") {
+    log.innerText += "\nSYSTEM FAILURE";
+  }
+});
+
+/* countdown */
+setInterval(() => {
+  if (!booted) return;
+
+  time--;
+
+  push({ time });
+
+  if (time <= 0) {
+    push({ status: "failure" });
+  }
+
+  if (time === 240) {
+    log.innerText += "\nRESTRICTIONS LIFTING";
+  }
+
+}, 1000);
+
+input.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+
+  const v = input.value.trim();
+  input.value = "";
+
+  log.innerText += "\n█ " + v;
+
+  /* BOOT */
+  if (!booted) {
+    booted = true;
+
+    push({
+      booted: true,
+      running: true,
+      status: "active",
+      time: 108 * 60
+    });
+
+    log.innerText += "\nSYSTEM INITIALIZED";
+    return;
+  }
+
+  /* RESET */
+  if (v === CODE) {
+    push({
+      time: 108 * 60,
+      status: "active"
+    });
+
+    log.innerText += "\nSYSTEM RESET";
+    return;
+  }
+
+  log.innerText += "\nINVALID ENTRY";
+});
+</script>
+
+</body>
+</html>
