@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FM Walkie Talkie</title>
+<style>
+body{
+margin:0;
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:#0b0b0f;
+font-family:Arial, sans-serif;
+color:white;
+}
+.container{
+width:340px;
+background:#16161d;
+border-radius:20px;
+padding:20px;
+box-shadow:0 0 30px rgba(0,0,0,0.6);
+text-align:center;
+}
+.dial-wrap{
+position:relative;
+width:220px;
+height:220px;
+margin:20px auto;
+}
+.dial{
+width:100%;
+height:100%;
+border-radius:50%;
+background: radial-gradient(circle at 30% 30%, #2a2a35, #0f0f14);
+border:2px solid #333;
+position:relative;
+transform:rotate(0deg);
+transition:transform 0.1s linear;
+}
+.marker{
+position:absolute;
+top:50%;
+left:50%;
+width:6px;
+height:80px;
+background:#00ff99;
+transform-origin:bottom center;
+transform:translate(-50%,-100%) rotate(0deg);
+border-radius:6px;
+box-shadow:0 0 10px #00ff99;
+}
+.freq-display{
+font-size:22px;
+margin-top:10px;
+color:#00ff99;
+}
+input[type=range]{
+width:100%;
+margin-top:10px;
+}
+button{
+margin-top:15px;
+padding:14px;
+width:100%;
+border:none;
+border-radius:12px;
+background:#00ff99;
+font-weight:bold;
+cursor:pointer;
+}
+button:active{transform:scale(0.98);}
+.log{
+margin-top:10px;
+height:120px;
+overflow-y:auto;
+background:#000;
+padding:10px;
+border-radius:10px;
+font-size:12px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h2>📡 FM Walkie Talkie</h2>
+
+<div class="dial-wrap">
+<div class="dial" id="dial">
+<div class="marker" id="marker"></div>
+</div>
+</div>
+
+<div class="freq-display">Frequency: <span id="freq">88.0</span> MHz</div>
+<input type="range" min="880" max="1080" value="880" id="slider" />
+
+<button id="talk">Hold to Talk 🎤</button>
+
+<div class="log" id="log"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyByAJ_lafYdkTrNoTbs2V4m8-yOs1t8vwA",
+  authDomain: "squirrelnews-53a89.firebaseapp.com",
+  databaseURL: "https://squirrelnews-53a89-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "squirrelnews-53a89",
+  storageBucket: "squirrelnews-53a89.appspot.com",
+  messagingSenderId: "521720919624",
+  appId: "1:521720919624:web:66e3b151eb4ef37ce7ca7d",
+  measurementId: "G-6GKQRT04WC"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const slider = document.getElementById('slider');
+const freqText = document.getElementById('freq');
+const marker = document.getElementById('marker');
+const dial = document.getElementById('dial');
+const log = document.getElementById('log');
+
+let freq = 88.0;
+
+function updateDial(val){
+  freq = val/10;
+  freqText.textContent = freq.toFixed(1);
+
+  const percent = (val - 880) / (1080 - 880);
+  const rotation = percent * 270 - 135;
+
+  marker.style.transform = `translate(-50%,-100%) rotate(${rotation}deg)`;
+  dial.style.transform = `rotate(${rotation/10}deg)`;
+
+  listen();
+}
+
+slider.oninput = e => updateDial(e.target.value);
+
+// WebRTC setup (simple mesh per frequency)
+let localStream;
+let peers = {};
+
+navigator.mediaDevices.getUserMedia({ audio:true }).then(stream=>{
+  localStream = stream;
+});
+
+const servers = { iceServers:[{ urls:"stun:stun.l.google.com:19302" }] };
+
+function joinChannel(){
+  const room = "freq_" + freq.toFixed(1);
+
+  db.ref("rooms/"+room+"/signals").on("child_added", async snap=>{
+    const data = snap.val();
+
+    if(data.sender === myId) return;
+
+    if(data.offer){
+      const pc = createPeer(data.sender);
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      db.ref("rooms/"+room+"/signals").push({ answer, sender: myId });
+    }
+
+    if(data.answer && peers[data.sender]){
+      await peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.answer));
+    }
+
+    if(data.candidate && peers[data.sender]){
+      peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+  });
+}
+
+function createPeer(id){
+  const pc = new RTCPeerConnection(servers);
+  peers[id] = pc;
+
+  localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+
+  pc.onicecandidate = e=>{
+    if(e.candidate){
+      db.ref("rooms/freq_"+freq.toFixed(1)+"/signals").push({ candidate:e.candidate, sender:myId });
+    }
+  };
+
+  pc.ontrack = e=>{
+    const audio = new Audio();
+    audio.srcObject = e.streams[0];
+    audio.play();
+
+    log.innerHTML += "📡 Live signal received<br>";
+  };
+
+  return pc;
+}
+
+const myId = Math.random().toString(36).substring(2);
+
+function callPeers(){
+  const room = "freq_" + freq.toFixed(1);
+
+  db.ref("rooms/"+room+"/peers").once("value", snap=>{
+    const peersList = snap.val() || {};
+
+    Object.keys(peersList).forEach(async id=>{
+      if(id === myId) return;
+
+      const pc = createPeer(id);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      db.ref("rooms/"+room+"/signals").push({ offer, sender: myId });
+    });
+
+    db.ref("rooms/"+room+"/peers").update({ [myId]: true });
+  });
+}
+
+function listen(){
+  joinChannel();
+  callPeers();
+}
+
+// push-to-talk
+const btn = document.getElementById('talk');
+let speaking = false;
+
+btn.onmousedown = ()=>{
+  speaking = true;
+  log.innerHTML += "🎤 Transmitting...<br>";
+};
+
+btn.onmouseup = ()=>{
+  speaking = false;
+};
+
+updateDial(880);
+</script>
+</body>
+</html>
