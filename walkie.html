@@ -125,6 +125,8 @@ const dial = document.getElementById('dial');
 const log = document.getElementById('log');
 
 let freq = 88.0;
+let currentRoom = null;
+let signalRef = null;
 
 function getRoom(){
   return "freq_" + freq.toFixed(1).replace('.', '_');
@@ -140,7 +142,7 @@ function updateDial(val){
   marker.style.transform = `translate(-50%,-100%) rotate(${rotation}deg)`;
   dial.style.transform = `rotate(${rotation/10}deg)`;
 
-  listen();
+  switchRoom();
 }
 
 slider.oninput = e => updateDial(e.target.value);
@@ -154,28 +156,50 @@ navigator.mediaDevices.getUserMedia({ audio:true }).then(stream=>{
 
 const servers = { iceServers:[{ urls:"stun:stun.l.google.com:19302" }] };
 
-function joinChannel(){
-  const room = getRoom();
+function switchRoom(){
+  const newRoom = getRoom();
+  if(newRoom === currentRoom) return;
 
-  db.ref("rooms/"+room+"/signals").on("child_added", async snap=>{
+  if(signalRef) signalRef.off();
+
+  currentRoom = newRoom;
+
+  peers = {};
+
+  listenRoom();
+}
+
+function listenRoom(){
+  const room = currentRoom;
+
+  signalRef = db.ref("rooms/"+room+"/signals");
+
+  signalRef.on("child_added", async snap=>{
     const data = snap.val();
-
-    if(data.sender === myId) return;
+    if(!data || data.sender === myId) return;
 
     if(data.offer){
       const pc = createPeer(data.sender);
+
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+
       db.ref("rooms/"+room+"/signals").push({ answer, sender: myId });
     }
 
     if(data.answer && peers[data.sender]){
-      await peers[data.sender].setRemoteDescription(new RTCSessionDescription(data.answer));
+      const pc = peers[data.sender];
+      if(pc.signalingState === "have-local-offer"){
+        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
     }
 
     if(data.candidate && peers[data.sender]){
-      peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
+      try{
+        await peers[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
+      }catch(e){}
     }
   });
 }
@@ -188,7 +212,7 @@ function createPeer(id){
 
   pc.onicecandidate = e=>{
     if(e.candidate){
-      db.ref("rooms/"+getRoom()+"/signals").push({ candidate:e.candidate, sender:myId });
+      db.ref("rooms/"+currentRoom+"/signals").push({ candidate:e.candidate, sender:myId });
     }
   };
 
@@ -206,15 +230,18 @@ function createPeer(id){
 const myId = Math.random().toString(36).substring(2);
 
 function callPeers(){
-  const room = getRoom();
+  const room = currentRoom;
+  if(!room) return;
 
   db.ref("rooms/"+room+"/peers").once("value", snap=>{
     const peersList = snap.val() || {};
 
     Object.keys(peersList).forEach(async id=>{
       if(id === myId) return;
+      if(peers[id]) return;
 
       const pc = createPeer(id);
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
@@ -226,7 +253,7 @@ function callPeers(){
 }
 
 function listen(){
-  joinChannel();
+  switchRoom();
   callPeers();
 }
 
