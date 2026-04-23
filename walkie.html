@@ -126,6 +126,10 @@ const log = document.getElementById('log');
 
 let freq = 88.0;
 
+function getRoom(){
+  return "freq_" + freq.toFixed(1).replace('.', '_');
+}
+
 function updateDial(val){
   freq = val/10;
   freqText.textContent = freq.toFixed(1);
@@ -141,7 +145,6 @@ function updateDial(val){
 
 slider.oninput = e => updateDial(e.target.value);
 
-// WebRTC setup (simple mesh per frequency)
 let localStream;
 let peers = {};
 
@@ -152,7 +155,7 @@ navigator.mediaDevices.getUserMedia({ audio:true }).then(stream=>{
 const servers = { iceServers:[{ urls:"stun:stun.l.google.com:19302" }] };
 
 function joinChannel(){
-  const room = "freq_" + freq.toFixed(1);
+  const room = getRoom();
 
   db.ref("rooms/"+room+"/signals").on("child_added", async snap=>{
     const data = snap.val();
@@ -185,7 +188,7 @@ function createPeer(id){
 
   pc.onicecandidate = e=>{
     if(e.candidate){
-      db.ref("rooms/freq_"+freq.toFixed(1)+"/signals").push({ candidate:e.candidate, sender:myId });
+      db.ref("rooms/"+getRoom()+"/signals").push({ candidate:e.candidate, sender:myId });
     }
   };
 
@@ -203,7 +206,7 @@ function createPeer(id){
 const myId = Math.random().toString(36).substring(2);
 
 function callPeers(){
-  const room = "freq_" + freq.toFixed(1);
+  const room = getRoom();
 
   db.ref("rooms/"+room+"/peers").once("value", snap=>{
     const peersList = snap.val() || {};
@@ -227,17 +230,10 @@ function listen(){
   callPeers();
 }
 
-// push-to-talk
 const btn = document.getElementById('talk');
-let speaking = false;
 
 btn.onmousedown = ()=>{
-  speaking = true;
   log.innerHTML += "🎤 Transmitting...<br>";
-};
-
-btn.onmouseup = ()=>{
-  speaking = false;
 };
 
 updateDial(880);
