@@ -60,11 +60,10 @@
     margin-top: 10px;
     font-size: 12px;
     color: #ff3b3b;
-    letter-spacing: 1px;
   }
 
   .status {
-    margin-top: 8px;
+    margin-top: 6px;
     font-size: 11px;
     opacity: 0.5;
   }
@@ -76,7 +75,7 @@
 <div class="player">
 
   <img id="cover" class="cover"
-       src="https://via.placeholder.com/300x300?text=DougFM" />
+       src="https://via.placeholder.com/300x300?text=Loading" />
 
   <div class="title" id="title">Loading...</div>
   <div class="artist" id="artist">Please wait</div>
@@ -85,7 +84,7 @@
     <source src="https://icecast.martiboa.co.uk/stream" type="audio/mpeg">
   </audio>
 
-  <button onclick="togglePlay()">Play / Pause</button>
+  <button id="playBtn" onclick="togglePlay()">▶ Play</button>
 
   <div class="live">🔴 LIVE</div>
   <div class="status" id="status">Connecting...</div>
@@ -98,32 +97,60 @@ const title = document.getElementById("title");
 const artist = document.getElementById("artist");
 const statusText = document.getElementById("status");
 const cover = document.getElementById("cover");
+const playBtn = document.getElementById("playBtn");
 
+let isPlaying = false;
+
+// 🎧 Play / Pause toggle (fixed button state)
 function togglePlay() {
-  if (audio.paused) {
+  if (!isPlaying) {
     audio.play();
+    isPlaying = true;
+    playBtn.textContent = "⏸ Pause";
   } else {
     audio.pause();
+    isPlaying = false;
+    playBtn.textContent = "▶ Play";
   }
 }
 
-// 🔥 FIXED METADATA PARSER (based on your Icecast JSON)
+// 🎵 LAST.FM API (album art)
+async function getLastFM(track) {
+  const apiKey = "022aae8e0665bba795dba68f0aaaeaf6";
+
+  const url = `https://ws.audioscrobbler.com/2.0/?method=track.getinfo&api_key=${apiKey}&artist=&track=${encodeURIComponent(track)}&format=json`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const image =
+      data?.track?.album?.image?.slice(-1)[0]?.["#text"];
+
+    if (image && image.length > 0) {
+      cover.src = image;
+    }
+  } catch (e) {
+    // fallback stays
+  }
+}
+
+// 🎧 Icecast metadata
 async function updateMetadata() {
   try {
     const res = await fetch("https://icecast.martiboa.co.uk/status-json.xsl");
     const data = await res.json();
 
     let source = data.icestats.source;
-
-    if (Array.isArray(source)) {
-      source = source[0];
-    }
+    if (Array.isArray(source)) source = source[0];
 
     const nowPlaying =
       source?.metadata?.x_icy_title ||
       source?.playlist?.trackList?.[0]?.title ||
       source?.title ||
       "Unknown Song";
+
+    statusText.textContent = `Listeners: ${source?.listeners ?? 0}`;
 
     if (nowPlaying.includes("-")) {
       const parts = nowPlaying.split("-");
@@ -134,15 +161,13 @@ async function updateMetadata() {
       title.textContent = nowPlaying;
     }
 
-    statusText.textContent = `Listeners: ${source?.listeners ?? 0}`;
-
-    // fallback cover (you can upgrade later with Spotify/Last.fm)
-    cover.src = "https://via.placeholder.com/300x300?text=LIVE+RADIO";
+    // 🎯 Last.fm lookup
+    getLastFM(nowPlaying);
 
   } catch (e) {
     title.textContent = "Radio Online";
     artist.textContent = "Stream Available";
-    statusText.textContent = "Metadata unavailable";
+    statusText.textContent = "Metadata offline";
   }
 }
 
