@@ -101,7 +101,7 @@ const playBtn = document.getElementById("playBtn");
 
 let isPlaying = false;
 
-// 🎧 Play / Pause toggle (fixed button state)
+// ▶️ Play / Pause
 function togglePlay() {
   if (!isPlaying) {
     audio.play();
@@ -114,24 +114,46 @@ function togglePlay() {
   }
 }
 
-// 🎵 LAST.FM API (album art)
-async function getLastFM(track) {
+// 🧠 Parse "Artist - Song"
+function parseTrack(raw) {
+  if (!raw) return { artist: "Live Stream", title: "Unknown Song" };
+
+  if (raw.includes("-")) {
+    const parts = raw.split("-");
+    return {
+      artist: parts[0].trim(),
+      title: parts.slice(1).join("-").trim()
+    };
+  }
+
+  return { artist: "Live Stream", title: raw };
+}
+
+// 🖼️ Last.fm album art
+async function getLastFM(artistName, trackName) {
   const apiKey = "022aae8e0665bba795dba68f0aaaeaf6";
 
-  const url = `https://ws.audioscrobbler.com/2.0/?method=track.getinfo&api_key=${apiKey}&artist=&track=${encodeURIComponent(track)}&format=json`;
+  if (!artistName || !trackName || artistName === "Live Stream") return;
 
   try {
+    const url =
+      `https://ws.audioscrobbler.com/2.0/?method=track.getinfo` +
+      `&api_key=${apiKey}` +
+      `&artist=${encodeURIComponent(artistName)}` +
+      `&track=${encodeURIComponent(trackName)}` +
+      `&format=json`;
+
     const res = await fetch(url);
     const data = await res.json();
 
     const image =
       data?.track?.album?.image?.slice(-1)[0]?.["#text"];
 
-    if (image && image.length > 0) {
+    if (image) {
       cover.src = image;
     }
   } catch (e) {
-    // fallback stays
+    console.log("Last.fm failed:", e);
   }
 }
 
@@ -152,17 +174,12 @@ async function updateMetadata() {
 
     statusText.textContent = `Listeners: ${source?.listeners ?? 0}`;
 
-    if (nowPlaying.includes("-")) {
-      const parts = nowPlaying.split("-");
-      artist.textContent = parts[0].trim();
-      title.textContent = parts[1].trim();
-    } else {
-      artist.textContent = "Live Stream";
-      title.textContent = nowPlaying;
-    }
+    const parsed = parseTrack(nowPlaying);
 
-    // 🎯 Last.fm lookup
-    getLastFM(nowPlaying);
+    artist.textContent = parsed.artist;
+    title.textContent = parsed.title;
+
+    getLastFM(parsed.artist, parsed.title);
 
   } catch (e) {
     title.textContent = "Radio Online";
