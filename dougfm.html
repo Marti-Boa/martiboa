@@ -1,80 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>DougFM</title>
-  <style>
-    body {
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
+<meta charset="UTF-8">
+<title>DougFM Radio Player</title>
+<style>
+  body {
+    margin: 0;
+    background: #0f0f0f;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
 
-    .player {
-      background: #222;
-      padding: 20px;
-      border-radius: 12px;
-      text-align: center;
-      width: 300px;
-    }
+  .player {
+    width: 320px;
+    background: #1c1c1c;
+    padding: 20px;
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0,0,0,0.6);
+  }
 
-    button {
-      padding: 10px 20px;
-      margin-top: 10px;
-      cursor: pointer;
-      border: none;
-      border-radius: 8px;
-      background: #4caf50;
-      color: white;
-      font-size: 16px;
-    }
+  img {
+    width: 100%;
+    border-radius: 12px;
+    background: #333;
+    height: 220px;
+    object-fit: cover;
+  }
 
-    button:hover {
-      background: #45a049;
-    }
+  .title {
+    margin-top: 10px;
+    font-size: 18px;
+    font-weight: bold;
+  }
 
-    .status {
-      margin-top: 10px;
-      font-size: 14px;
-      opacity: 0.8;
-    }
-  </style>
+  .artist {
+    font-size: 14px;
+    opacity: 0.7;
+    margin-bottom: 10px;
+  }
+
+  button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 10px;
+    background: #4caf50;
+    color: white;
+    cursor: pointer;
+  }
+
+  .live {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #ff4444;
+  }
+</style>
 </head>
+
 <body>
 
-  <div class="player">
-    <h2>🎧 Live Radio</h2>
+<div class="player">
 
-    <audio id="radio" preload="none">
-      <source src="https://icecast.martiboa.co.uk/stream" type="audio/mpeg">
-      Your browser does not support audio.
-    </audio>
+  <img id="cover" src="https://via.placeholder.com/300x300?text=Radio" />
 
-    <button onclick="togglePlay()">Play / Pause</button>
+  <div class="title" id="title">Loading...</div>
+  <div class="artist" id="artist">Please wait</div>
 
-    <div class="status" id="status">Stopped</div>
-  </div>
+  <audio id="audio">
+    <source src="https://icecast.martiboa.co.uk/stream" type="audio/mpeg">
+  </audio>
 
-  <script>
-    const radio = document.getElementById("radio");
-    const status = document.getElementById("status");
+  <button onclick="toggle()">Play / Pause</button>
 
-    function togglePlay() {
-      if (radio.paused) {
-        radio.play();
-        status.textContent = "Now Playing 🎶";
-      } else {
-        radio.pause();
-        status.textContent = "Paused ⏸️";
-      }
+  <div class="live">🔴 LIVE</div>
+</div>
+
+<script>
+const audio = document.getElementById("audio");
+const title = document.getElementById("title");
+const artist = document.getElementById("artist");
+const cover = document.getElementById("cover");
+
+// play/pause
+function toggle() {
+  if (audio.paused) {
+    audio.play();
+  } else {
+    audio.pause();
+  }
+}
+
+// fetch Icecast metadata
+async function updateMetadata() {
+  try {
+    const res = await fetch("https://icecast.martiboa.co.uk/status-json.xsl");
+    const data = await res.json();
+
+    const source = data.icestats.source;
+
+    let nowPlaying = source.title || "Unknown Track";
+
+    // split artist - title if possible
+    if (nowPlaying.includes("-")) {
+      const parts = nowPlaying.split("-");
+      artist.textContent = parts[0].trim();
+      title.textContent = parts[1].trim();
+    } else {
+      artist.textContent = "Live Stream";
+      title.textContent = nowPlaying;
     }
-  </script>
+
+    // fallback image (you can upgrade later with Spotify API)
+    cover.src = "https://via.placeholder.com/300x300?text=Live+Radio";
+
+  } catch (e) {
+    title.textContent = "Radio Online";
+    artist.textContent = "Unable to load metadata";
+  }
+}
+
+updateMetadata();
+setInterval(updateMetadata, 5000);
+</script>
 
 </body>
 </html>
