@@ -1,3 +1,80 @@
-<div class="cstrEmbed" data-type="newStreamPlayer" data-publicToken="76a41bed-9e60-4d5e-909b-cf158b5e1f21" data-theme="light" data-color="6C2BDD" data-channelId="" data-rendered="false">
-<a href="https://www.caster.fm">Shoutcast Hosting</a> <a href="https://www.caster.fm">Stream Hosting</a> <a href="https://www.caster.fm">Radio Server Hosting</a></div>
-<script src="//cdn.cloud.caster.fm//widgets/embed.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Radio Station</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .player {
+      background: #222;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      width: 300px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background: #4caf50;
+      color: white;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="player">
+    <h2>🎧 Live Radio</h2>
+
+    <audio id="radio" preload="none">
+      <source src="http://90.204.129.242/stream" type="audio/mpeg">
+      Your browser does not support audio.
+    </audio>
+
+    <button onclick="togglePlay()">Play / Pause</button>
+
+    <div class="status" id="status">Stopped</div>
+  </div>
+
+  <script>
+    const radio = document.getElementById("radio");
+    const status = document.getElementById("status");
+
+    function togglePlay() {
+      if (radio.paused) {
+        radio.play();
+        status.textContent = "Now Playing 🎶";
+      } else {
+        radio.pause();
+        status.textContent = "Paused ⏸️";
+      }
+    }
+  </script>
+
+</body>
+</html>
