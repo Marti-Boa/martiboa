@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>DougFM Radio Player</title>
+<title>DougFM Radio</title>
+
 <style>
   body {
     margin: 0;
-    background: #0f0f0f;
+    background: #0b0b0b;
     color: white;
     font-family: Arial, sans-serif;
     display: flex;
@@ -16,24 +17,24 @@
   }
 
   .player {
-    width: 320px;
-    background: #1c1c1c;
+    width: 340px;
+    background: #181818;
     padding: 20px;
-    border-radius: 16px;
+    border-radius: 18px;
     text-align: center;
-    box-shadow: 0 0 20px rgba(0,0,0,0.6);
+    box-shadow: 0 0 25px rgba(0,0,0,0.7);
   }
 
-  img {
+  .cover {
     width: 100%;
-    border-radius: 12px;
+    height: 260px;
+    border-radius: 14px;
     background: #333;
-    height: 220px;
     object-fit: cover;
   }
 
   .title {
-    margin-top: 10px;
+    margin-top: 12px;
     font-size: 18px;
     font-weight: bold;
   }
@@ -41,23 +42,31 @@
   .artist {
     font-size: 14px;
     opacity: 0.7;
-    margin-bottom: 10px;
+    margin-top: 4px;
   }
 
   button {
-    margin-top: 10px;
-    padding: 10px 20px;
+    margin-top: 14px;
+    padding: 10px 18px;
     border: none;
     border-radius: 10px;
     background: #4caf50;
     color: white;
     cursor: pointer;
+    font-size: 14px;
   }
 
   .live {
     margin-top: 10px;
     font-size: 12px;
-    color: #ff4444;
+    color: #ff3b3b;
+    letter-spacing: 1px;
+  }
+
+  .status {
+    margin-top: 8px;
+    font-size: 11px;
+    opacity: 0.5;
   }
 </style>
 </head>
@@ -66,7 +75,8 @@
 
 <div class="player">
 
-  <img id="cover" src="https://via.placeholder.com/300x300?text=Radio" />
+  <img id="cover" class="cover"
+       src="https://via.placeholder.com/300x300?text=DougFM" />
 
   <div class="title" id="title">Loading...</div>
   <div class="artist" id="artist">Please wait</div>
@@ -75,19 +85,21 @@
     <source src="https://icecast.martiboa.co.uk/stream" type="audio/mpeg">
   </audio>
 
-  <button onclick="toggle()">Play / Pause</button>
+  <button onclick="togglePlay()">Play / Pause</button>
 
   <div class="live">🔴 LIVE</div>
+  <div class="status" id="status">Connecting...</div>
+
 </div>
 
 <script>
 const audio = document.getElementById("audio");
 const title = document.getElementById("title");
 const artist = document.getElementById("artist");
+const statusText = document.getElementById("status");
 const cover = document.getElementById("cover");
 
-// play/pause
-function toggle() {
+function togglePlay() {
   if (audio.paused) {
     audio.play();
   } else {
@@ -95,17 +107,24 @@ function toggle() {
   }
 }
 
-// fetch Icecast metadata
+// 🔥 FIXED METADATA PARSER (based on your Icecast JSON)
 async function updateMetadata() {
   try {
     const res = await fetch("https://icecast.martiboa.co.uk/status-json.xsl");
     const data = await res.json();
 
-    const source = data.icestats.source;
+    let source = data.icestats.source;
 
-    let nowPlaying = source.title || "Unknown Track";
+    if (Array.isArray(source)) {
+      source = source[0];
+    }
 
-    // split artist - title if possible
+    const nowPlaying =
+      source?.metadata?.x_icy_title ||
+      source?.playlist?.trackList?.[0]?.title ||
+      source?.title ||
+      "Unknown Song";
+
     if (nowPlaying.includes("-")) {
       const parts = nowPlaying.split("-");
       artist.textContent = parts[0].trim();
@@ -115,12 +134,15 @@ async function updateMetadata() {
       title.textContent = nowPlaying;
     }
 
-    // fallback image (you can upgrade later with Spotify API)
-    cover.src = "https://via.placeholder.com/300x300?text=Live+Radio";
+    statusText.textContent = `Listeners: ${source?.listeners ?? 0}`;
+
+    // fallback cover (you can upgrade later with Spotify/Last.fm)
+    cover.src = "https://via.placeholder.com/300x300?text=LIVE+RADIO";
 
   } catch (e) {
     title.textContent = "Radio Online";
-    artist.textContent = "Unable to load metadata";
+    artist.textContent = "Stream Available";
+    statusText.textContent = "Metadata unavailable";
   }
 }
 
