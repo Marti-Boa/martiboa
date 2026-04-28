@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Andrew Menzies | Fanpage</title>
+    <style>
+        /* GLOBAL STYLES - Orange Theme */
+        :root {
+            --primary-accent: #ff9800;  /* Vibrant Orange */
+            --secondary-accent: #e67e22; /* Deep Orange */
+            --bg-color: #fffaf0;        /* Light Cream/Orange Tint */
+            --text-color: #333;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* NAVIGATION */
+        nav {
+            background: var(--secondary-accent);
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        /* HERO SECTION */
+        header {
+            background: linear-gradient(135deg, var(--primary-accent), var(--secondary-accent));
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 3rem;
+        }
+
+        /* MAIN LAYOUT */
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+        }
+
+        /* SIDEBAR (Portrait) */
+        .sidebar {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            height: fit-content;
+        }
+
+        .portrait-img {
+            width: 100%;
+            max-width: 250px;
+            height: auto;
+            border-radius: 8px;
+            border: 4px solid var(--primary-accent);
+            margin-bottom: 15px;
+        }
+
+        /* CONTENT CARDS */
+        .content-card {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            border-left: 5px solid var(--primary-accent);
+            padding-left: 15px;
+            color: var(--secondary-accent);
+        }
+
+        /* LISTS */
+        ul {
+            list-style-type: square;
+            padding-left: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px;
+            font-size: 0.9rem;
+            color: #777;
+        }
+
+        /* RESPONSIVE DESIGN */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="#about">About</a>
+    <a href="#projects">Projects</a>
+    <a href="#news">Latest News</a>
+</nav>
+
+<header>
+    <h1>Andrew Menzies</h1>
+    <p>Official Fan Tribute Site</p>
+</header>
+
+<div class="container">
+    <aside class="sidebar">
+        <img src="portrait.png" alt="Andrew Menzies Portrait" class="portrait-img">
+        <h3>Fast Facts</h3>
+        <p><strong>Field:</strong> [Insert Field]</p>
+        <p><strong>Known For:</strong> [Known for X]</p>
+        <p><strong>Status:</strong> Active</p>
+    </aside>
+
+    <main>
+        <section id="about" class="content-card">
+            <h2>About Andrew</h2>
+            <p>
+                [Your custom biography goes here. Describe who Andrew Menzies is and why you're a fan!]
+            </p>
+        </section>
+
+        <section id="projects" class="content-card">
+            <h2>Highlights & Achievements</h2>
+            <ul>
+                <li><strong>Achievement 1:</strong> Description of the project or event.</li>
+                <li><strong>Achievement 2:</strong> Description of the project or event.</li>
+                <li><strong>Achievement 3:</strong> Description of the project or event.</li>
+            </ul>
+        </section>
+
+        <section id="news" class="content-card">
+            <h2>Latest Updates</h2>
+            <p>Keep up with the latest news regarding Andrew Menzies' upcoming work and appearances.</p>
+        </section>
+    </main>
+</div>
+
+<footer class="footer">
+    <p>Created with &hearts; by an Andrew Menzies Fan</p>
+    <p>&copy; 2026</p>
+</footer>
+
+</body>
+</html>
