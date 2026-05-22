@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebOS Terminal Runtime Environment</title>
+    <style>
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0;
+            background-color: #0a0f0d;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            height: 100%; overflow: hidden;
+        }
+        :root {
+            --primary: #33ff66;
+            --bg: #0a0f0d;
+        }
+        body, html {
+            background-color: var(--bg);
+            color: var(--primary);
+        }
+        #terminal {
+            display: flex;
+            flex-direction: column;
+            width: 100%; height: 100%;
+            padding: 20px; overflow-y: auto;
+            text-shadow: 0 0 5px rgba(51, 255, 102, 0.3);
+        }
+        #terminal::after {
+            content: " "; display: block;
+            position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            z-index: 2; background-size: 100% 4px;
+            pointer-events: none;
+        }
+        #output-log { white-space: pre-wrap; word-wrap: break-word; }
+        .input-line { display: flex; align-items: center; width: 100%; margin-top: 5px; }
+        .prompt { color: #33ccff; white-space: nowrap; margin-right: 10px; }
+        #cmd-input {
+            flex-grow: 1; background: transparent; border: none; outline: none;
+            color: var(--primary); font-family: inherit; font-size: inherit;
+            text-shadow: inherit; padding: 0;
+        }
+        .system-response { margin-bottom: 12px; color: #e0e0e0; }
+        .error-response { color: #ff3333; margin-bottom: 12px; }
+
+        /* Structural workspaces */
+        #editor-container, #program-container {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: var(--bg);
+            z-index: 100; flex-direction: column;
+        }
+        #editor-header, #program-header {
+            background: var(--primary); color: var(--bg);
+            padding: 10px; font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .editor-controls, .program-controls { display: flex; gap: 15px; }
+        .editor-btn, .program-btn {
+            background: transparent; border: 1px solid var(--bg);
+            color: var(--bg); font-family: inherit; font-size: 0.9rem;
+            font-weight: bold; cursor: pointer; padding: 4px 12px;
+            border-radius: 3px;
+        }
+        .editor-btn:active, .program-btn:active { background: rgba(0, 0, 0, 0.1); }
+        #editor-textarea {
+            flex-grow: 1; background: transparent; color: var(--primary);
+            border: none; outline: none; padding: 20px;
+            font-family: 'Courier New', monospace; font-size: 1.1rem; resize: none;
+        }
+        
+        #program-iframe {
+            flex-grow: 1; width: 100%; border: none; background: #ffffff;
+        }
+        
+        @media (max-width: 768px) {
+            body, html { font-size: 14px; }
+            #terminal { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="terminal" onclick="focusInput()">
+    <div id="output-log">WebOS Application Sandboxing Subsystem Initialized.
+Bi-directional File IPC Active (Read/Write Supported).
+Type "help" to see available options.
+
+</div>
+    <div class="input-line">
+        <span class="prompt" id="prompt-label">loading...$</span>
+        <input type="text" id="cmd-input" autofocus autocomplete="off" autocapitalize="none" spellcheck="false">
+    </div>
+</div>
+
+<!-- Text Editor Workspace -->
+<div id="editor-container">
+    <div id="editor-header">
+        <span id="editor-filename">EDITING FILE: file.txt</span>
+        <div class="editor-controls">
+            <button class="editor-btn" onclick="triggerSave()">Save</button>
+            <button class="editor-btn" onclick="triggerExit()">Exit</button>
+        </div>
+    </div>
+    <textarea id="editor-textarea"></textarea>
+</div>
+
+<!-- Full Screen App Sandbox Viewport -->
+<div id="program-container">
+    <div id="program-header">
+        <span id="program-title">RUNNING PROGRAM: app.html</span>
+        <div class="program-controls">
+            <button class="program-btn" onclick="terminateProgram()">[ Terminate Process ]</button>
+        </div>
+    </div>
+    <iframe id="program-iframe" sandbox="allow-scripts"></iframe>
+</div>
+
+<script>
+    // --- DEMO APP WITH INTEGRATED READ/WRITE STORAGE IPC ---
+    const DEMO_APP_CODE = `<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f4f8; color: #333; }
+        button { padding: 8px 16px; font-size: 0.9rem; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; margin: 5px 2px; }
+        button:hover { background: #0056b3; }
+        input[type="text"] { padding: 8px; width: 200px; font-family: monospace; border: 1px solid #ccc; border-radius: 4px; }
+        textarea { width: 100%; height: 120px; margin-top: 10px; font-family: monospace; box-sizing: border-box; padding: 10px; }
+        .box { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <h3>WebOS Bi-Directional VFS Bridge</h3>
+    
+    <div class="box">
+        <h4>Read System File</h4>
+        <input type="text" id="read-filename" value="notes.txt" placeholder="filename.txt">
+        <button onclick="readFileFromOS()">Fetch Data</button>
+    </div>
+
+    <div class="box">
+        <h4>Write System File</h4>
+        <input type="text" id="write-filename" value="sandbox_output.txt" placeholder="filename.txt">
+        <button onclick="saveFileToOS()">Commit Changes</button>
+    </div>
+
+    <textarea id="file-content">Load a file, or modify this text to write back out.</textarea>
+
+    <script>
+        // Request host OS file data pointer
+        function readFileFromOS() {
+            const filename = document.getElementById('read-filename').value;
+            window.parent.postMessage({
+                type: 'READ_FILE',
+                filename: filename
+            }, '*');
+        }
+
+        // Request host OS storage update
+        function saveFileToOS() {
+            const filename = document.getElementById('write-filename').value;
+            const content = document.getElementById('file-content').value;
+            window.parent.postMessage({
+                type: 'WRITE_FILE',
+                filename: filename,
+                data: content
+            }, '*');
+        }
+        
+        // Listen for kernel callbacks
+        window.addEventListener('message', (e) => {
+            const payload = e.data;
+            if (!payload || typeof payload !== 'object') return;
+
+            if (payload.type === 'READ_RESULT') {
+                if (payload.success) {
+                    document.getElementById('file-content').value = payload.data;
+                } else {
+                    alert('OS File Read Error: ' + payload.error);
+                }
+            }
+            
+            if (payload.type === 'WRITE_ACK') {
+                alert('OS File Write Confirmation: ' + payload.message);
+            }
+        });
+    <\/script>
+</body>
+</html>`;
+
+    const DEFAULT_VFS = {
+        "home": {
+            "admin": { 
+                "example.html": DEMO_APP_CODE,
+                "notes.txt": "This is raw system content hosted in notes.txt inside /home/admin." 
+            },
+            "guest": { "readme.txt": "Guest welcome log space." }
+        },
+        "bin": { "sysinfo": "System Binary Object Pointer Data." }
+    };
+
+    const DEFAULT_USERS = {
+        "admin": { hasSuperPowers: true },
+        "guest": { hasSuperPowers: false }
+    };
+
+    // Hydration loops
+    let vfs = JSON.parse(localStorage.getItem("webos_vfs")) || DEFAULT_VFS;
+    let accounts = JSON.parse(localStorage.getItem("webos_users")) || DEFAULT_USERS;
+    let installedApps = JSON.parse(localStorage.getItem("webos_installed_packages")) || [];
+    let savedTheme = localStorage.getItem("webos_theme") || "#33ff66";
+    
+    let currentUser = localStorage.getItem("webos_active_user") || "admin";
+    let currentPath = ["home", currentUser];
+    if (!resolvePath(currentPath)) currentPath = ["home"];
+
+    document.documentElement.style.setProperty('--primary', savedTheme);
+
+    const terminal = document.getElementById("terminal");
+    const outputLog = document.getElementById("output-log");
+    const cmdInput = document.getElementById("cmd-input");
+    const promptLabel = document.getElementById("prompt-label");
+
+    function focusInput() { cmdInput.focus(); }
+    
+    function commitToStorage() {
+        localStorage.setItem("webos_vfs", JSON.stringify(vfs));
+        localStorage.setItem("webos_users", JSON.stringify(accounts));
+        localStorage.setItem("webos_active_user", currentUser);
+        localStorage.setItem("webos_installed_packages", JSON.stringify(installedApps));
+    }
+
+    function resolvePath(pathArray) {
+        let current = vfs;
+        for (const dir of pathArray) {
+            if (current && typeof current === 'object' && dir in current) {
+                current = current[dir];
+            } else { return null; }
+        }
+        return current;
+    }
+
+    function updatePrompt() {
+        const pathString = currentPath.length === 0 ? "/" : "/" + currentPath.join("/");
+        const tokenFlag = accounts[currentUser].hasSuperPowers ? "#" : "$";
+        promptLabel.innerText = `${currentUser}@webos:${pathString}${tokenFlag}`;
+    }
+
+    function print(text, className = "system-response") {
+        const div = document.createElement("div");
+        div.className = className;
+        div.textContent = text;
+        outputLog.appendChild(div);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    // --- SYSTEM SHELL COMMAND ENGINE ---
+    const commands = {
+        help: () => {
+            return `Available system utilities:
+  ls, cd, cat, touch, mkdir, edit, clear, color
+  whoami, userlist, useradd, login, susr, userperm
+  htrun [file.html] - Boot HTML app with secure filesystem access`;
+        },
+
+        whoami: () => `Account: ${currentUser} | Susr Mode: ${accounts[currentUser].hasSuperPowers}`,
+        userlist: () => "Accounts: " + Object.keys(accounts).join(", "),
+        clear: () => { outputLog.innerHTML = ""; return null; },
+
+        ls: () => {
+            const currentDir = resolvePath(currentPath);
+            const items = Object.keys(currentDir);
+            if (items.length === 0) return "[Directory Empty]";
+            return items.map(n => typeof currentDir[n] === 'object' ? `${n}/` : n).join("    ");
+        },
+
+        cd: (args) => {
+            const target = args[0]; if (!target) return "Usage: cd [directory]";
+            if (target === ".") return null;
+            if (target === "..") { if (currentPath.length > 0) currentPath.pop(); updatePrompt(); return null; }
+            const currentDir = resolvePath(currentPath);
+            if (target in currentDir && typeof currentDir[target] === 'object') {
+                currentPath.push(target); updatePrompt();
+            } else { return `cd: path not found: ${target}`; }
+            return null;
+        },
+
+        cat: (args) => {
+            const target = args[0]; if (!target) return "Usage: cat [filename]";
+            const currentDir = resolvePath(currentPath);
+            if (target in currentDir) {
+                return typeof currentDir[target] === 'string' ? currentDir[target] : `cat: ${target}: Is a directory`;
+            }
+            return `cat: file not found: ${target}`;
+        },
+
+        touch: (args) => {
+            const name = args[0]; if (!name) return "Usage: touch [filename]";
+            resolvePath(currentPath)[name] = ""; commitToStorage();
+            return `Created empty file: '${name}'`;
+        },
+
+        mkdir: (args) => {
+            const name = args[0]; if (!name) return "Usage: mkdir [directory]";
+            resolvePath(currentPath)[name] = {}; commitToStorage();
+            return `Created directory: '${name}/'`;
+        },
+
+        edit: (args) => {
+            const filename = args[0]; if (!filename) return "Usage: edit [filename]";
+            const currentDir = resolvePath(currentPath);
+            openEditor(filename, currentDir[filename] || ""); return null;
+        },
+
+        color: (args) => {
+            const colors = { green: "#33ff66", amber: "#ffb000", white: "#ffffff", blue: "#33ccff" };
+            const choice = args[0];
+            if (colors[choice]) {
+                document.documentElement.style.setProperty('--primary', colors[choice]);
+                localStorage.setItem("webos_theme", colors[choice]);
+                return `Theme adjusted to: ${choice}.`;
+            }
+            return "Usage: color [green|amber|white|blue]";
+        },
+
+        useradd: (args) => {
+            const name = args[0]; if (!name) return "Usage: useradd [username]";
+            if (accounts[name]) return `Error: User already exists: '${name}'`;
+            accounts[name] = { hasSuperPowers: false };
+            if (!vfs.home) vfs.home = {};
+            vfs.home[name] = { "init.txt": `Profile initialized for ${name}.` };
+            commitToStorage();
+            return `Account profile created for '${name}'.`;
+        },
+
+        login: (args) => {
+            const target = args[0]; if (!target) return "Usage: login [username]";
+            if (!accounts[target]) return `Login rejected for user: '${target}'`;
+            currentUser = target;
+            currentPath = vfs.home && vfs.home[currentUser] ? ["home", currentUser] : [];
+            commitToStorage(); updatePrompt();
+            return `Logged in as: ${currentUser}`;
+        },
+
+        userperm: (args) => {
+            if (!accounts[currentUser].hasSuperPowers) return "Permission Denied.";
+            const targetUser = args[0]; const stateFlag = args[1];
+            if (!targetUser || !stateFlag) return "Usage: userperm [username] [1|0]";
+            if (!accounts[targetUser]) return `User missing: '${targetUser}'`;
+            accounts[targetUser].hasSuperPowers = stateFlag === "1";
+            commitToStorage();
+            return `Updated privileges for '${targetUser}'`;
+        },
+
+        susr: (args) => {
+            if (args.length === 0) return "Usage: susr [command] [args...]";
+            const actionCommand = args[0].toLowerCase(); const processArgs = args.slice(1);
+            if (!commands[actionCommand]) return `susr: command missing: ${actionCommand}`;
+            const activeSessionUserBackup = currentUser; let executionOutput;
+            try {
+                accounts[currentUser].hasSuperPowers = true;
+                executionOutput = commands[actionCommand](processArgs);
+            } catch (err) {
+                executionOutput = `Fault: ${err.message}`;
+            } finally {
+                if (accounts[activeSessionUserBackup] && activeSessionUserBackup !== "admin") {
+                    accounts[activeSessionUserBackup].hasSuperPowers = false;
+                }
+                currentUser = activeSessionUserBackup; updatePrompt();
+            }
+            return executionOutput;
+        },
+
+        htrun: (args) => {
+            const filename = args[0];
+            if (!filename) return "Usage: htrun [filename.html]";
+
+            const currentDir = resolvePath(currentPath);
+            if (!(filename in currentDir)) return `htrun: target file not found: '${filename}'`;
+            
+            const rawHtmlContent = currentDir[filename];
+            if (typeof rawHtmlContent !== "string") return `htrun: '${filename}' is a directory structural node.`;
+
+            bootProgramSandbox(filename, rawHtmlContent);
+            return null;
+        }
+    };
+
+    // --- TERMINAL EVENT MATRIX ---
+    cmdInput.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+            const inputRaw = cmdInput.value; const currentPrompt = promptLabel.innerText;
+            print(`${currentPrompt} ${inputRaw}`, "system-response");
+            cmdInput.value = "";
+
+            const trimmed = inputRaw.trim();
+            if (trimmed !== "") {
+                const parts = trimmed.split(/\s+/); const commandName = parts[0].toLowerCase(); const args = parts.slice(1);
+
+                if (commands[commandName]) {
+                    const response = commands[commandName](args);
+                    if (response !== null) print(response, "system-response");
+                } else {
+                    print(`command not found: ${commandName}`, "error-response");
+                }
+            }
+        }
+    });
+
+    // --- EDIT SYSTEM WORKSPACE ---
+    let editingFile = null;
+    function openEditor(filename, content) {
+        editingFile = filename;
+        document.getElementById("editor-container").style.display = "flex";
+        document.getElementById("editor-filename").innerText = `EDITING FILE: ${filename}`;
+        const textarea = document.getElementById("editor-textarea");
+        textarea.value = content;
+        setTimeout(() => textarea.focus(), 80);
+    }
+    function triggerSave() {
+        if (!editingFile) return;
+        resolvePath(currentPath)[editingFile] = document.getElementById("editor-textarea").value;
+        commitToStorage();
+        const label = document.getElementById("editor-filename"); const cache = label.innerText;
+        label.innerText = "✓ PERSISTENT STATE SAVED";
+        setTimeout(() => { if (editingFile) label.innerText = cache; }, 1200);
+    }
+    function triggerExit() {
+        document.getElementById("editor-container").style.display = "none"; editingFile = null;
+        setTimeout(() => cmdInput.focus(), 50);
+    }
+
+    // --- APPLICATION RUNTIME PROCESS CONTROLLER ---
+    let activeAppBlobUrl = null;
+
+    function bootProgramSandbox(title, htmlSource) {
+        const container = document.getElementById("program-container");
+        const iframe = document.getElementById("program-iframe");
+        document.getElementById("program-title").innerText = `ACTIVE APPLICATION PROCESS TARGET: ${title}`;
+
+        const blob = new Blob([htmlSource], { type: "text/html" });
+        activeAppBlobUrl = URL.createObjectURL(blob);
+        
+        container.style.display = "flex";
+        iframe.src = activeAppBlobUrl;
+    }
+
+    function terminateProgram() {
+        const container = document.getElementById("program-container");
+        const iframe = document.getElementById("program-iframe");
+
+        container.style.display = "none";
+        iframe.src = "about:blank";
+
+        if (activeAppBlobUrl) {
+            URL.revokeObjectURL(activeAppBlobUrl);
+            activeAppBlobUrl = null;
+        }
+        
+        print("Application closed safely.", "system-response");
+        setTimeout(() => cmdInput.focus(), 50);
+    }
+
+    // --- CORES INTER-PROCESS KERNEL BRIDGE ---
+    window.addEventListener("message", function(event) {
+        const packet = event.data;
+        if (!packet || typeof packet !== "object") return;
+        
+        const iframe = document.getElementById("program-iframe");
+        if (!iframe || !iframe.contentWindow) return;
+
+        const currentDir = resolvePath(currentPath);
+
+        // HANDLE FILE READ REQ
+        if (packet.type === "READ_FILE") {
+            const filename = packet.filename;
+            
+            if (!filename) {
+                iframe.contentWindow.postMessage({ type: "READ_RESULT", success: false, error: "Missing filename specification token." }, "*");
+                return;
+            }
+
+            if (filename in currentDir) {
+                if (typeof currentDir[filename] === "string") {
+                    // Send back the data string contents
+                    iframe.contentWindow.postMessage({
+                        type: "READ_RESULT",
+                        success: true,
+                        filename: filename,
+                        data: currentDir[filename]
+                    }, "*");
+                    print(`[IPC Notice]: App read system file -> '${filename}'`, "system-response");
+                } else {
+                    iframe.contentWindow.postMessage({ type: "READ_RESULT", success: false, error: "Target node is a system directory folder structure." }, "*");
+                }
+            } else {
+                iframe.contentWindow.postMessage({ type: "READ_RESULT", success: false, error: "File record address targets not found." }, "*");
+            }
+        }
+
+        // HANDLE FILE WRITE REQ
+        if (packet.type === "WRITE_FILE") {
+            const filename = packet.filename;
+            const fileData = packet.data;
+
+            if (!filename) return;
+
+            currentDir[filename] = fileData;
+            commitToStorage();
+
+            print(`[IPC Notice]: App updated system file -> '${filename}'`, "system-response");
+
+            iframe.contentWindow.postMessage({
+                type: "WRITE_ACK",
+                message: `File node '${filename}' cleanly allocated inside VFS directory paths.`
+            }, "*");
+        }
+    });
+
+    // Shortcuts
+    window.addEventListener("keydown", (e) => {
+        if (editingFile) {
+            if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); triggerSave(); }
+            if (e.ctrlKey && e.key.toLowerCase() === 'x') { e.preventDefault(); triggerExit(); }
+        }
+    });
+
+    updatePrompt();
+</script>
+</body>
+</html>
