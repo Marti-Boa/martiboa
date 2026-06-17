@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Clone</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+        /* App Container with native vertical snap scrolling */
+        #app-container {
+            width: 100%;
+            height: 100vh;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scrollbar-width: none; /* Hide scrollbar for Firefox */
+        }
+        #app-container::-webkit-scrollbar {
+            display: none; /* Hide scrollbar for Chrome/Safari/Webkit */
+        }
+        /* Video Card Layer */
+        .video-card {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            scroll-snap-align: start;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* Sidebar Action Controls */
+        .sidebar {
+            position: absolute;
+            right: 15px;
+            bottom: 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+            z-index: 10;
+        }
+        .action-btn {
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        .action-btn:active {
+            transform: scale(0.9);
+        }
+        .action-btn span {
+            font-weight: bold;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+        /* Overlay Text Details */
+        .video-details {
+            position: absolute;
+            left: 15px;
+            bottom: 30px;
+            color: white;
+            z-index: 10;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
+            max-width: 75%;
+        }
+        .video-details h3 {
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        .video-details p {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.3;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container"></div>
+
+    <script>
+        const container = document.getElementById('app-container');
+
+        // Fetch feed data from our Node backend API
+        async function fetchFeed() {
+            try {
+                const response = await fetch('/api/videos');
+                const videos = await response.json();
+                renderFeed(videos);
+            } catch (err) {
+                console.error("Error loading feed:", err);
+            }
+        }
+
+        // Render data elements dynamically
+        function renderFeed(videos) {
+            container.innerHTML = '';
+            videos.forEach(video => {
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.innerHTML = `
+                    <video src="${video.video_url}" loop playsinline muted></video>
+                    <div class="sidebar">
+                        <button class="action-btn" onclick="likeVideo(${video.id}, this)">
+                            ❤️ <span class="like-count">${video.likes}</span>
+                        </button>
+                        <button class="action-btn">💬 <span>${video.shares}</span></button>
+                    </div>
+                    <div class="video-details">
+                        <h3>@creator_node_${video.id}</h3>
+                        <p>${video.description}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            setupAutoPlay();
+        }
+
+        // Toggle API Call for likes updates
+        async function likeVideo(id, buttonElement) {
+            try {
+                const response = await fetch(`/api/videos/${id}/like`, { method: 'POST' });
+                const updatedVideo = await response.json();
+                buttonElement.querySelector('.like-count').innerText = updatedVideo.likes;
+            } catch (err) {
+                console.error("Couldn't process like counter:", err);
+            }
+        }
+
+        // Intersection Observer: Plays the video inside view frame seamlessly
+        function setupAutoPlay() {
+            const observerOptions = {
+                root: container,
+                threshold: 0.6 // Execute when 60% of the card interface is visible
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target.querySelector('video');
+                    if (entry.isIntersecting) {
+                        // Unmute playback attempt context on active gesture loop
+                        video.play().catch(err => console.log("Waiting for user tap interaction to unblock media engine."));
+                    } else {
+                        video.pause();
+                        video.currentTime = 0; // Reset video position on exit
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.video-card').forEach(card => observer.observe(card));
+        }
+
+        // Initialize feed application layout pipeline
+        fetchFeed();
+    </script>
+</body>
+</html>
