@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Survival Shift</title>
+    <style>
+        /* CSS Textures and Environment */
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #050505; color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden; touch-action: none; user-select: none;
+        }
+
+        #game-container {
+            position: relative; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* Office Styling */
+        #office {
+            position: absolute; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #2a2a2a 0%, #000 80%);
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+            transition: background 0.3s;
+            z-index: 1;
+        }
+        #office.light-on {
+            background: radial-gradient(circle at center, #555 0%, #111 90%);
+        }
+
+        /* Doors */
+        .door-frame {
+            position: absolute; top: 10%; width: 15%; height: 70%;
+            background-color: #111; border: 4px solid #333;
+            box-shadow: inset 0 0 20px #000;
+        }
+        #left-door-frame { left: 5%; }
+        #right-door-frame { right: 5%; }
+
+        .door {
+            position: absolute; top: 0; width: 100%; height: 0%;
+            background: repeating-linear-gradient(0deg, #333, #333 10px, #222 10px, #222 20px);
+            border-bottom: 5px solid #111;
+            transition: height 0.2s ease-in-out;
+        }
+        .door.closed { height: 100%; }
+
+        /* UI Overlays */
+        #hud {
+            position: absolute; top: 20px; right: 30px; text-align: right; z-index: 10;
+            font-size: 24px; text-shadow: 2px 2px 0 #000;
+        }
+        #usage-meter { color: #0f0; font-weight: bold; }
+
+        /* Fixed-Position Touch Controls */
+        .touch-panel {
+            position: fixed; top: 50%; transform: translateY(-50%);
+            width: 80px; height: 160px; display: flex; flex-direction: column; gap: 10px;
+            z-index: 20;
+        }
+        #left-controls { left: 20px; }
+        #right-controls { right: 20px; }
+
+        .btn {
+            flex: 1; border-radius: 10px; border: 2px solid #555;
+            background: linear-gradient(145deg, #444, #222);
+            color: white; font-weight: bold; text-align: center;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); font-size: 14px;
+        }
+        .btn:active { background: #222; box-shadow: inset 0 4px 6px rgba(0,0,0,0.8); }
+        .btn.active-btn { border-color: #0f0; background: #050; }
+        .btn.active-btn-door { border-color: #f00; background: #500; }
+
+        #camera-toggle {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 200px; height: 50px; background: rgba(255,255,255,0.2);
+            border: 2px solid #fff; border-radius: 5px; z-index: 20;
+            font-size: 18px; text-align: center; line-height: 46px; backdrop-filter: blur(2px);
+        }
+
+        /* Camera System */
+        #camera-view {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px), #111;
+            z-index: 15; display: none;
+        }
+        #camera-map {
+            position: absolute; bottom: 80px; right: 20px;
+            width: 200px; height: 200px; background: rgba(0,0,0,0.8); border: 2px solid #fff;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 5px;
+        }
+        .cam-btn {
+            background: #333; border: 1px solid #777; color: #fff; cursor: pointer;
+        }
+        .cam-btn.active-cam { background: #555; border-color: #fff; }
+        
+        #cam-feed-label { position: absolute; top: 30px; left: 30px; font-size: 32px; letter-spacing: 5px;}
+        
+        /* Animatronic Graphic Inserts */
+        .animatronic-graphic {
+            position: absolute; object-fit: contain; display: none;
+            filter: drop-shadow(0 0 10px #000);
+        }
+        
+        /* Insert PNG here for the Jumpscare */
+        #jumpscare {
+            top: 0; left: 0; width: 100%; height: 100%; z-index: 100;
+            background-color: #000;
+        }
+
+        /* Insert PNG here for the Camera feed */
+        #animatronic-cam {
+            top: 20%; left: 30%; width: 40%; height: 60%; z-index: 16;
+            opacity: 0.7; filter: grayscale(100%) contrast(150%);
+        }
+        
+        /* Office Hallway Warning (when light is on) */
+        #hallway-warning {
+            position: absolute; width: 100%; text-align: center; top: 40%; 
+            font-size: 40px; color: red; display: none; z-index: 5;
+            font-weight: bold; text-shadow: 0 0 10px #f00;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="office">
+        <div id="left-door-frame" class="door-frame"><div id="left-door" class="door"></div></div>
+        <div id="right-door-frame" class="door-frame"><div id="right-door" class="door"></div></div>
+        <div id="hallway-warning">ANIMATRONIC AT DOOR!</div>
+    </div>
+
+    <div id="hud">
+        <div id="night-display">Night 1</div>
+        <div id="time-display">12 AM</div>
+        <div>Power: <span id="power-display">100</span>%</div>
+        <div>Usage: <span id="usage-meter">||</span></div>
+    </div>
+
+    <div id="left-controls" class="touch-panel">
+        <div id="btn-door-left" class="btn">DOOR</div>
+        <div id="btn-light-left" class="btn">LIGHT</div>
+    </div>
+    <div id="right-controls" class="touch-panel">
+        <div id="btn-door-right" class="btn">DOOR</div>
+        <div id="btn-light-right" class="btn">LIGHT</div>
+    </div>
+
+    <div id="camera-toggle">Toggle Monitor</div>
+
+    <div id="camera-view">
+        <div id="cam-feed-label">CAM 1A</div>
+        <img id="animatronic-cam" class="animatronic-graphic" src="YOUR_ANIMATRONIC.png" alt="Enemy on Cam">
+        <div id="camera-map">
+            <button class="cam-btn active-cam" data-cam="1A">CAM 1A</button>
+            <button class="cam-btn" data-cam="1B">CAM 1B</button>
+            <button class="cam-btn" data-cam="2A">CAM 2A (Left)</button>
+            <button class="cam-btn" data-cam="2B">CAM 2B (Right)</button>
+        </div>
+    </div>
+
+    <img id="jumpscare" class="animatronic-graphic" src="https://martiboa.co.uk/Uploads/Skibidi.jpeg" alt="Jumpscare!">
+</div>
+
+<script>
+    // --- Game State ---
+    const state = {
+        night: 1,
+        time: 0, // 0 = 12AM, 1 = 1AM, etc.
+        power: 100,
+        usage: 1,
+        leftDoor: false, rightDoor: false,
+        leftLight: false, rightLight: false,
+        camOpen: false, currentCam: '1A',
+        isGameOver: false,
+        enemyPos: '1A' // Progression: 1A -> 1B -> 2A(Left)/2B(Right) -> Door -> Kill
+    };
+
+    // --- References ---
+    const uiPower = document.getElementById('power-display');
+    const uiTime = document.getElementById('time-display');
+    const uiUsage = document.getElementById('usage-meter');
+    const uiNight = document.getElementById('night-display');
+    const office = document.getElementById('office');
+    const warning = document.getElementById('hallway-warning');
+    const animCamImg = document.getElementById('animatronic-cam');
+
+    // --- Mechanics Logic ---
+    function updateUsage() {
+        state.usage = 1;
+        if(state.leftDoor) state.usage++;
+        if(state.rightDoor) state.usage++;
+        if(state.leftLight || state.rightLight) state.usage++;
+        if(state.camOpen) state.usage++;
+        uiUsage.innerText = '|'.repeat(state.usage);
+    }
+
+    function powerDrain() {
+        if(state.isGameOver || state.power <= 0) return;
+        state.power -= (state.usage * 0.1); 
+        if(state.power <= 0) {
+            state.power = 0;
+            triggerPowerOutage();
+        }
+        uiPower.innerText = Math.ceil(state.power);
+    }
+
+    function timeProgression() {
+        if(state.isGameOver) return;
+        state.time++;
+        uiTime.innerText = state.time === 0 ? "12 AM" : `${state.time} AM`;
+        if(state.time >= 6) winNight();
+    }
+
+    // --- AI Logic ---
+    function enemyMovement() {
+        if(state.isGameOver || state.camOpen) return; // Pauses slightly while cams are up
+
+        // AI Aggressiveness scales with the Night level
+        const aiLevel = state.night * 2; 
+        const moveAttempt = Math.floor(Math.random() * 20);
+
+        if(moveAttempt < aiLevel) {
+            if(state.enemyPos === '1A') state.enemyPos = '1B';
+            else if(state.enemyPos === '1B') state.enemyPos = Math.random() > 0.5 ? '2A' : '2B';
+            else if(state.enemyPos === '2A') state.enemyPos = 'LeftDoor';
+            else if(state.enemyPos === '2B') state.enemyPos = 'RightDoor';
+            else if(state.enemyPos === 'LeftDoor') {
+                if(state.leftDoor) state.enemyPos = '1A'; // Reset if door closed
+                else triggerJumpscare();
+            }
+            else if(state.enemyPos === 'RightDoor') {
+                if(state.rightDoor) state.enemyPos = '1A';
+                else triggerJumpscare();
+            }
+            updateVisuals();
+        }
+    }
+
+    function updateVisuals() {
+        // Camera Enemy Visibility
+        animCamImg.style.display = (state.enemyPos === state.currentCam && state.camOpen) ? 'block' : 'none';
+
+        // Door Warning when lights are on
+        warning.style.display = 'none';
+        if(state.leftLight && state.enemyPos === 'LeftDoor') warning.style.display = 'block';
+        if(state.rightLight && state.enemyPos === 'RightDoor') warning.style.display = 'block';
+    }
+
+    // --- Endings ---
+    function triggerJumpscare() {
+        state.isGameOver = true;
+        document.getElementById('camera-view').style.display = 'none';
+        document.getElementById('jumpscare').style.display = 'block';
+        setTimeout(() => location.reload(), 3000);
+    }
+
+    function triggerPowerOutage() {
+        // Force everything off
+        ['btn-door-left', 'btn-door-right', 'btn-light-left', 'btn-light-right', 'camera-toggle'].forEach(id => {
+            document.getElementById(id).style.pointerEvents = 'none';
+        });
+        document.getElementById('left-door').classList.remove('closed');
+        document.getElementById('right-door').classList.remove('closed');
+        document.getElementById('camera-view').style.display = 'none';
+        office.className = '';
+        setTimeout(triggerJumpscare, 5000); // 5 seconds in the dark before death
+    }
+
+    function winNight() {
+        state.isGameOver = true;
+        alert(`6 AM! You survived Night ${state.night}!`);
+        state.night++;
+        resetNight();
+    }
+
+    function resetNight() {
+        state.time = 0; state.power = 100; state.enemyPos = '1A';
+        state.isGameOver = false;
+        uiNight.innerText = `Night ${state.night}`;
+        uiTime.innerText = "12 AM";
+    }
+
+    // --- Inputs / Fixed Touch Overlays ---
+    function setupControls() {
+        const bindButton = (id, toggleStateCallback) => {
+            const el = document.getElementById(id);
+            el.addEventListener('pointerdown', (e) => {
+                if(state.power <= 0) return;
+                const isActive = toggleStateCallback();
+                el.classList.toggle('active-btn', isActive && !id.includes('door'));
+                el.classList.toggle('active-btn-door', isActive && id.includes('door'));
+                updateUsage();
+                updateVisuals();
+            });
+        };
+
+        bindButton('btn-door-left', () => { 
+            state.leftDoor = !state.leftDoor; 
+            document.getElementById('left-door').classList.toggle('closed', state.leftDoor);
+            return state.leftDoor; 
+        });
+        
+        bindButton('btn-door-right', () => { 
+            state.rightDoor = !state.rightDoor; 
+            document.getElementById('right-door').classList.toggle('closed', state.rightDoor);
+            return state.rightDoor; 
+        });
+
+        bindButton('btn-light-left', () => {
+            state.leftLight = !state.leftLight;
+            if(state.leftLight) { state.rightLight = false; document.getElementById('btn-light-right').classList.remove('active-btn'); }
+            office.className = state.leftLight ? 'light-on' : '';
+            return state.leftLight;
+        });
+
+        bindButton('btn-light-right', () => {
+            state.rightLight = !state.rightLight;
+            if(state.rightLight) { state.leftLight = false; document.getElementById('btn-light-left').classList.remove('active-btn'); }
+            office.className = state.rightLight ? 'light-on' : '';
+            return state.rightLight;
+        });
+
+        document.getElementById('camera-toggle').addEventListener('pointerdown', () => {
+            if(state.power <= 0) return;
+            state.camOpen = !state.camOpen;
+            document.getElementById('camera-view').style.display = state.camOpen ? 'block' : 'none';
+            updateUsage();
+            updateVisuals();
+        });
+
+        document.querySelectorAll('.cam-btn').forEach(btn => {
+            btn.addEventListener('pointerdown', (e) => {
+                document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active-cam'));
+                e.target.classList.add('active-cam');
+                state.currentCam = e.target.getAttribute('data-cam');
+                document.getElementById('cam-feed-label').innerText = `CAM ${state.currentCam}`;
+                updateVisuals();
+            });
+        });
+    }
+
+    // --- Game Loops ---
+    setupControls();
+    setInterval(powerDrain, 1000);       // Drain power every second based on usage
+    setInterval(timeProgression, 15000); // 15 real seconds = 1 in-game hour
+    setInterval(enemyMovement, 4000);    // AI calculates movement every 4 seconds
+</script>
+
+</body>
+</html>
